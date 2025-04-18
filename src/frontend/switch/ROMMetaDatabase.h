@@ -2,11 +2,14 @@
 #define ROMMETADATABASE_H
 
 #include "Gfx.h"
-
+#include <unordered_map>
 #include <vector>
+#include <string>
 
 namespace ROMMetaDatabase
 {
+
+extern std::unordered_map<std::string, int> DatabaseByName;
 
 enum
 {

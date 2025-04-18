@@ -110,8 +110,11 @@ USAGE:
  *                          HEADER
  *
  * =============================================================== */
+#include <math.h>
+
 #ifndef MMX_H_
 #define MMX_H_
+
 
 #ifdef __cplusplus
 extern "C" {
