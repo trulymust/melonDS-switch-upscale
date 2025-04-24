@@ -33,6 +33,8 @@
 
 #include <string.h>
 
+#include "RetroAchievements.h"
+
 bool Done = false;
 int CurrentUiScreen = uiScreen_Start;
 
@@ -967,6 +969,9 @@ int main(int argc, const char* argv[])
     appletHook(&aptCookie, OnAppletHook, NULL);
 
     Config::Load();
+
+    InitRetroAchievements();
+    
     strcpy(Config::FirmwarePath, "firmware.bin");
     strcpy(Config::BIOS9Path, "bios9.bin");
     strcpy(Config::BIOS7Path, "bios7.bin");

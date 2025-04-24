@@ -44,13 +44,13 @@ As for the rest, the interface should be pretty straightforward. If you have a q
 1. Install dependencies: `sudo apt install cmake libcurl4-gnutls-dev libpcap0.8-dev libsdl2-dev qt5-default libslirp-dev libarchive-dev libepoxy-dev`
 2. Download the melonDS repository and prepare:
   ```bash
-  git clone https://github.com/Arisotura/melonDS
+  git clone https://github.com/Gheovgos/melonDS
   cd melonDS
   mkdir build && cd build
   ```
 3. Compile:
   ```bash
-  cmake ..
+  cmake .. -DENABLE_OGLRENDERER=OFF -DBUILD_QT_SDL=OFF -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-Switch.cmake
   make -j$(nproc --all)
   ```
 

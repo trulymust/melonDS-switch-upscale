@@ -16,7 +16,7 @@ SET(SOURCES_SWITCH
     ErrorDialog.cpp
     GpuMemHeap.cpp
     UploadBuffer.cpp
-
+    RetroAchievements.cpp
     ../Util_ROM.cpp
     ../Util_Audio.cpp
     ../Util_Video.cpp
@@ -24,12 +24,19 @@ SET(SOURCES_SWITCH
     mm_vec/mm_vec.c
     stb_truetype/stb_truetype.c
     stb_image/stb_image.c
+
+    ../../../external/rcheevos/src/rapi/rc_api_info.c
+    ../../../external/rcheevos/src/rapi/rc_api_user.c
+    ../../../external/rcheevos/src/rcheevos/consoleinfo.c
+    ../../../external/rcheevos/src/rhash/rc_hash_internal.h
 )
+
+include(${CMAKE_SOURCE_DIR}/cmake/Toolchain-cross-Switch.cmake)
 
 add_executable(melonDS.elf ${SOURCES_SWITCH})
 if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
     if (ENABLE_LTO)
-        target_link_libraries(melonDS.elf nxd deko3dd core)
+        target_link_libraries(melonDS.elf nxd deko3dd core nx)
     else()
         target_link_libraries(melonDS.elf core deko3dd nxd)
     endif()
@@ -44,9 +51,11 @@ endif()
 target_include_directories(melonDS.elf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(melonDS.elf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_include_directories(melonDS.elf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+target_include_directories(melonDS.elf PUBLIC "${CMAKE_SOURCE_DIR}/external/rcheevos/include")
+
 
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/control.nacp
-                   COMMAND ${NACPTOOL} --create "melonDS switch fast alpha" "Arisotura, RSDuck, Hydr8gon" "release 6" ${CMAKE_BINARY_DIR}/control.nacp)
+                   COMMAND ${NACPTOOL} --create "melonDS switch fast alpha" "Arisotura, RSDuck, Hydr8gon, Jpe230, Gheovgos" "release 7" ${CMAKE_BINARY_DIR}/control.nacp)
 
 make_directory(${CMAKE_BINARY_DIR}/romfs/shaders)
 
