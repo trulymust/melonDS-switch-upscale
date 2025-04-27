@@ -160,6 +160,11 @@ void DoGui(BoxGui::Frame& parent)
                 CurrentUiScreen = uiScreen_InputSettings;
             }
             sideBarSkewer.Advance(spacing);
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, "RetroAchievements settings"))
+            {
+                CurrentUiScreen = uiScreen_RetroAchievementsSettings;
+            }
+            sideBarSkewer.Advance(spacing);
             if (SideBarEntry(sideBarFrame, sideBarSkewer, "Close", true))
             {
                 Emulation::Stop();
@@ -191,6 +196,10 @@ void DoGui(BoxGui::Frame& parent)
             if (SideBarEntry(sideBarFrame, sideBarSkewer, "Input settings", true))
             {
                 CurrentUiScreen = uiScreen_InputSettings;
+            }
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, "RetroAchievements settings"))
+            {
+                CurrentUiScreen = uiScreen_RetroAchievementsSettings;
             }
             sideBarSkewer.Advance(spacing);
             if (SideBarEntry(sideBarFrame, sideBarSkewer, "Exit", true))

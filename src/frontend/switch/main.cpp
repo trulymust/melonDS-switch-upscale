@@ -969,7 +969,6 @@ int main(int argc, const char* argv[])
     appletHook(&aptCookie, OnAppletHook, NULL);
 
     Config::Load();
-
     InitRetroAchievements();
     
     strcpy(Config::FirmwarePath, "firmware.bin");
@@ -1077,6 +1076,5 @@ int main(int argc, const char* argv[])
     socketExit();
 
     appletUnlockExit();
-
     return 0;
 }

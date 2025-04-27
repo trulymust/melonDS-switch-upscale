@@ -35,6 +35,9 @@ extern int LimitFramerate;
 
 extern int ShowPerformanceMetrics;
 
+extern char RetroAchievementsUsername[64];
+extern char RetroAchievementsPassword[64];
+
 }
 
 #endif

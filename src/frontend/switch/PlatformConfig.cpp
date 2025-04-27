@@ -34,6 +34,9 @@ int LimitFramerate;
 
 int ShowPerformanceMetrics;
 
+char RetroAchievementsUsername[64] = "";
+char RetroAchievementsPassword[64] = "";
+
 ConfigEntry PlatformConfigFile[] =
 {
     {"GlobalRotation",          0, &GlobalRotation,         0, NULL, 0},

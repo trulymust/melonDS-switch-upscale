@@ -260,6 +260,46 @@ void SectionHeader(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
     Gfx::DrawText(Gfx::SystemFontStandard, nameFrame.Area.Position + Gfx::Vector2f{10.f, 0.f}, height, DarkColor, "%s", name);
 }
 
+void DoTextField(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* label, char* buffer, size_t bufferSize, bool first = false)
+{
+    BoxGui::Frame settingFrame{parent, skewer.Spit({parent.Area.Size.X, UIRowHeight}, Gfx::align_Right),
+        {5.f, 5.f}, {5.f, 5.f}};
+
+    bool selected = BoxGui::InputElement(settingFrame, BoxGui::MakeUniqueName(SettingsPrefix, BoxGui::MakeUniqueName(label, 0)));
+    if (selected && BoxGui::ConfirmPressed())
+    {
+        // Qui si potrebbe aprire una tastiera su Switch o un text edit dialog
+        // Per ora magari nulla o un placeholder
+    }
+
+    if (selected)
+    {
+        KeyExplanation::Explain(KeyExplanation::button_A, "Edit");
+    }
+
+    Gfx::DrawRectangle(settingFrame.Area.Position - Gfx::Vector2f{0.f, 5.f}, settingFrame.Area.Size + Gfx::Vector2f{0.f, 5.f*2.f}, WidgetColorBright, true);
+    if (selected)
+        Gfx::DrawRectangle(settingFrame.Area.Position, settingFrame.Area.Size, WidgetColorVibrant);
+
+    BoxGui::Skewer settingSkewer{settingFrame, settingFrame.Area.Size.Y/2.f, BoxGui::direction_Horizontal};
+
+    settingSkewer.AlignLeft(20.f);
+    Gfx::DrawText(Gfx::SystemFontStandard, settingSkewer.CurrentPosition(), TextLineHeight, DarkColor,
+        Gfx::align_Left, Gfx::align_Center, label);
+
+    settingSkewer.AlignRight(20.f);
+    Gfx::DrawText(Gfx::SystemFontStandard, settingSkewer.CurrentPosition(), TextLineHeight, DarkColor,
+        Gfx::align_Right, Gfx::align_Center, buffer);
+
+    if (!first)
+    {
+        Gfx::DrawRectangle(settingFrame.Area.Position + Gfx::Vector2f{10.f, -(5.f + 1.f)},
+            {settingFrame.Area.Size.X - 2*10.f, 2.f},
+            SeparatorColor);
+    }
+}
+
+
 void DoGui(BoxGui::Frame& parent)
 {
     BoxGui::Frame settingsFrame{parent,
@@ -355,6 +395,13 @@ void DoGui(BoxGui::Frame& parent)
             DoCheckbox(settingsFrame, settingsSkewer, "Left handed mode", leftHanded);
             Config::LeftHandedMode = leftHanded;
         }
+        break;
+    case uiScreen_RetroAchievementsSettings:
+        title = "RetroAchievements Settings";
+
+        DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Username", Config::RetroAchievementsUsername, sizeof(Config::RetroAchievementsUsername));
+        DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Password", Config::RetroAchievementsPassword, sizeof(Config::RetroAchievementsPassword));        
+
         break;
     }
     Gfx::PopScissor();

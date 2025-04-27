@@ -25,10 +25,38 @@ SET(SOURCES_SWITCH
     stb_truetype/stb_truetype.c
     stb_image/stb_image.c
 
+    ../../../external/rcheevos/src/rc_util.c
+    ../../../external/rcheevos/src/rc_client_raintegration.c
+    ../../../external/rcheevos/src/rc_client.c
+    ../../../external/rcheevos/src/rc_compat.c
+    ../../../external/rcheevos/src/rc_compat.h
+    ../../../external/rcheevos/src/rc_version.c
+    ../../../external/rcheevos/src/rapi/rc_api_common.c
+    ../../../external/rcheevos/src/rapi/rc_api_editor.c
     ../../../external/rcheevos/src/rapi/rc_api_info.c
+    ../../../external/rcheevos/src/rapi/rc_api_runtime.c
     ../../../external/rcheevos/src/rapi/rc_api_user.c
+    ../../../external/rcheevos/src/rcheevos/alloc.c
+    ../../../external/rcheevos/src/rcheevos/condition.c
+    ../../../external/rcheevos/src/rcheevos/condset.c
     ../../../external/rcheevos/src/rcheevos/consoleinfo.c
-    ../../../external/rcheevos/src/rhash/rc_hash_internal.h
+    ../../../external/rcheevos/src/rcheevos/format.c
+    ../../../external/rcheevos/src/rcheevos/lboard.c
+    ../../../external/rcheevos/src/rcheevos/memref.c
+    ../../../external/rcheevos/src/rcheevos/operand.c
+    ../../../external/rcheevos/src/rcheevos/rc_validate.c
+    ../../../external/rcheevos/src/rcheevos/richpresence.c
+    ../../../external/rcheevos/src/rcheevos/runtime_progress.c
+    ../../../external/rcheevos/src/rcheevos/runtime.c
+    ../../../external/rcheevos/src/rcheevos/trigger.c
+    ../../../external/rcheevos/src/rcheevos/value.c
+    ../../../external/rcheevos/src/rhash/cdreader.c
+    ../../../external/rcheevos/src/rhash/hash_encrypted.c
+    ../../../external/rcheevos/src/rhash/hash_rom.c
+    ../../../external/rcheevos/src/rhash/hash_zip.c
+    ../../../external/rcheevos/src/rhash/hash.c
+    ../../../external/rcheevos/src/rhash/md5.c
+    ../../../external/rcheevos/src/rurl/url.c
 )
 
 include(${CMAKE_SOURCE_DIR}/cmake/Toolchain-cross-Switch.cmake)
@@ -47,6 +75,8 @@ else()
         target_link_libraries(melonDS.elf core deko3d nx)
     endif()
 endif()
+
+target_link_libraries(melonDS.elf curl z)
 
 target_include_directories(melonDS.elf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(melonDS.elf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/..")

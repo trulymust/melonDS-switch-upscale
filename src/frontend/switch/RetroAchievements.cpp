@@ -1,70 +1,79 @@
 #include <fstream>
 #include <string>
 #include <switch.h>
+#include <curl/curl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <cstring>
+#include <cstdlib>
+extern "C" {
+    #include <rc_api_user.h>
+    #include <rc_api_runtime.h>
+}
 
-#include "../../../external/rcheevos/src/rapi/rc_api_user.c"
+    
 
-static std::string ra_username = "Username";
-static std::string ra_token = "Token";
+static std::string g_response;
+
+static size_t switch_curl_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t realsize = size * nmemb;
+    g_response.append((char*)contents, realsize);
+    return realsize;
+}
+
+const char* send_http_request(const char* url, const char* post_data, int* status_code) {
+    g_response.clear();
+
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        *status_code = -1;
+        return nullptr;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, switch_curl_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, nullptr);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); 
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L); 
+
+    CURLcode res = curl_easy_perform(curl);
+    if (res != CURLE_OK) {
+        *status_code = -1;
+        curl_easy_cleanup(curl);
+        return nullptr;
+    }
+
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    *status_code = static_cast<int>(http_code);
+
+    curl_easy_cleanup(curl);
+
+    char* response_cstr = static_cast<char*>(malloc(g_response.size() + 1));
+    if (response_cstr) {
+        std::memcpy(response_cstr, g_response.c_str(), g_response.size() + 1);
+    }
+
+    return response_cstr;
+}
 
 void InitRetroAchievements() {
     rc_api_login_request_t api_params;
     memset(&api_params, 0, sizeof(api_params));
 
-    api_params.username = ra_username;
-    api_params.api_token = ra_token;
-    api_params.password = "Password"
+    api_params.username = "Gheovgos";
+    api_params.api_token = "PsyVsTzJE2eJBs8BikiXVzu2aCCrXQo7";
+    api_params.password = "DagothUr7";
 
     rc_api_request_t api_request;
 
     rc_api_init_login_request(&api_request, &api_params);
 
-    printf("RA login: %s\n", ra_username.c_str());
+    int status_code;
 
-    httpcContext context;
-    Result rc = httpcOpenContext(&context, HTTPC_METHOD_POST, "https://retroachievements.org/dorequest.php", 0);
-    if (R_FAILED(rc)) {
-        printf("httpcOpenContext failed: 0x%x\n", rc);
-        return;
-    }
+    const char* response_body = send_http_request(api_request.url, api_request.post_data, &status_code);
 
-    httpcSetKeepAlive(&context, true);
-    httpcSetSSLOpt(&context, SSLCOPT_DisableVerify);
-    httpcAddRequestHeaderField(&context, "Content-Type", "application/x-www-form-urlencoded");
-    httpcSetPostDataRaw(&context, login_req.post_data, strlen(login_req.post_data));
-
-    rc = httpcBeginRequest(&context);
-    if (R_FAILED(rc)) {
-        printf("httpcBeginRequest failed: 0x%x\n", rc);
-        httpcCloseContext(&context);
-        return;
-    }
-
-    u32 status_code = 0;
-    httpcGetResponseStatusCode(&context, &status_code, 0);
-    printf("HTTP status: %d\n", status_code);
-
-    char buffer[2048];
-    size_t outsize = 0;
-    rc = httpcDownloadData(&context, buffer, sizeof(buffer) - 1, &outsize);
-    buffer[outsize] = '\0';
-
-    if (R_FAILED(rc)) {
-        printf("httpcDownloadData failed: 0x%x\n", rc);
-        httpcCloseContext(&context);
-        return;
-    }
-
-    printf("RA response: %s\n", buffer);
-
-    int ret = rc_api_process_login_response(&login_res, buffer);
-    if (ret == RC_OK && login_res.succeeded) {
-        printf("RA login successful! User: %s, Score: %d\n", login_res.username, login_res.score);
-    } else {
-        printf("RA login failed: %s\n", login_res.error_message ? login_res.error_message : "Unknown error");
-    }
-
-    httpcCloseContext(&context);
+    // rc_api_request_destroy(&api_request);
+    
 }
