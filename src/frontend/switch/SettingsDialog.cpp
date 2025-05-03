@@ -270,8 +270,21 @@ void DoTextField(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* labe
     bool selected = BoxGui::InputElement(settingFrame, BoxGui::MakeUniqueName(SettingsPrefix, BoxGui::MakeUniqueName(label, 0)));
     if (selected && BoxGui::ConfirmPressed())
     {
-        // Qui si potrebbe aprire una tastiera su Switch o un text edit dialog
-        // Per ora magari nulla o un placeholder
+        SwkbdConfig kbd;
+        Result rc = swkbdCreate(&kbd, 0);
+        if (R_SUCCEEDED(rc)) {
+            swkbdConfigMakePresetDefault(&kbd);
+            swkbdConfigSetInitialText(&kbd, buffer);
+            swkbdConfigSetTextCheckCallback(&kbd, NULL);
+    
+            char out[bufferSize];
+            rc = swkbdShow(&kbd, out, bufferSize);
+            if (R_SUCCEEDED(rc)) {
+                strncpy(buffer, out, bufferSize - 1);
+                buffer[bufferSize - 1] = '\0';
+            }
+            swkbdClose(&kbd);
+        }
     }
 
     if (selected)
