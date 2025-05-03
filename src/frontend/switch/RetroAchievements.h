@@ -1,3 +1,3 @@
 #pragma once
 
-void InitRetroAchievements();
+int InitRetroAchievements(const char* username, const char* password);

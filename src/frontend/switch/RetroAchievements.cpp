@@ -58,13 +58,13 @@ const char* send_http_request(const char* url, const char* post_data, int* statu
     return response_cstr;
 }
 
-void InitRetroAchievements() {
+int InitRetroAchievements(const char* username, const char* password) {
     rc_api_login_request_t api_params;
     memset(&api_params, 0, sizeof(api_params));
 
-    api_params.username = "Gheovgos";
-    api_params.api_token = "PsyVsTzJE2eJBs8BikiXVzu2aCCrXQo7";
-    api_params.password = "DagothUr7";
+    api_params.username = username;
+    // api_params.api_token = "PsyVsTzJE2eJBs8BikiXVzu2aCCrXQo7";
+    api_params.password = password;
 
     rc_api_request_t api_request;
 
@@ -73,6 +73,8 @@ void InitRetroAchievements() {
     int status_code;
 
     const char* response_body = send_http_request(api_request.url, api_request.post_data, &status_code);
+
+    return status_code;
 
     // rc_api_request_destroy(&api_request);
     

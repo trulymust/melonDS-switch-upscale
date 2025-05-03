@@ -9,6 +9,8 @@
 
 #include <string.h>
 
+#include "RetroAchievements.h"
+
 namespace SettingsDialog
 {
 const char* SettingsPrefix = "settingsdialog_entries";
@@ -299,7 +301,6 @@ void DoTextField(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* labe
     }
 }
 
-
 void DoGui(BoxGui::Frame& parent)
 {
     BoxGui::Frame settingsFrame{parent,
@@ -348,6 +349,23 @@ void DoGui(BoxGui::Frame& parent)
             Config::JIT_LiteralOptimisations = literalOptimisations;
             Config::JIT_FastMemory = fastMemory;
         }
+        {
+            bool loginRA = false;
+            int status = 0;
+            SectionHeader(settingsFrame, settingsSkewer, "RetroAchievements");
+            DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Username", Config::RetroAchievementsUsername, sizeof(Config::RetroAchievementsUsername));
+            DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Password", Config::RetroAchievementsPassword, sizeof(Config::RetroAchievementsPassword));
+            DoCheckbox(settingsFrame, settingsSkewer, "Login", loginRA);
+            if (loginRA) {
+                status = InitRetroAchievements(Config::RetroAchievementsUsername, Config::RetroAchievementsPassword);
+                if (status != 200) {
+                    DoCombobox(settingsFrame, settingsSkewer, "Login status", "Failed", Config::ConsoleType, true);
+                }
+                else {
+                    DoCombobox(settingsFrame, settingsSkewer, "Login status", "Successs", Config::ConsoleType, true);
+                }   
+            }
+        }
         break;
     case uiScreen_DisplaySettings:
         title = "Presentation settings";
@@ -395,13 +413,6 @@ void DoGui(BoxGui::Frame& parent)
             DoCheckbox(settingsFrame, settingsSkewer, "Left handed mode", leftHanded);
             Config::LeftHandedMode = leftHanded;
         }
-        break;
-    case uiScreen_RetroAchievementsSettings:
-        title = "RetroAchievements Settings";
-
-        DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Username", Config::RetroAchievementsUsername, sizeof(Config::RetroAchievementsUsername));
-        DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Password", Config::RetroAchievementsPassword, sizeof(Config::RetroAchievementsPassword));        
-
         break;
     }
     Gfx::PopScissor();

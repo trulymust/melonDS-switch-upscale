@@ -969,7 +969,7 @@ int main(int argc, const char* argv[])
     appletHook(&aptCookie, OnAppletHook, NULL);
 
     Config::Load();
-    InitRetroAchievements();
+    // InitRetroAchievements();
     
     strcpy(Config::FirmwarePath, "firmware.bin");
     strcpy(Config::BIOS9Path, "bios9.bin");
