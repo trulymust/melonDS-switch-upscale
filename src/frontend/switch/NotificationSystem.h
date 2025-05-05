@@ -1,23 +1,17 @@
 #pragma once
 #include <string>
+#include <time.h> 
 
 struct Notification {
-    std::string message;
-    float timeRemaining = 0.f;
     bool active = false;
+    std::string message;
+    time_t startTime = 0;
+    int durationSeconds = 3;
 
-    void Show(const std::string& msg, float duration = 3.0f) {
+    void Show(const std::string& msg) {
         message = msg;
-        timeRemaining = duration;
         active = true;
-    }
-
-    void Update(float deltaTime) {
-        if (!active) return;
-        timeRemaining -= deltaTime;
-        if (timeRemaining <= 0.f) {
-            active = false;
-        }
+        startTime = time(nullptr);
     }
 
     void Render();

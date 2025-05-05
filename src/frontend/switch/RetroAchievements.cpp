@@ -67,28 +67,24 @@ static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_byte
   // TODO: implement later
   return 0;
 }
-
 // This is the HTTP request dispatcher that is provided to the rc_client. Whenever the client
 // needs to talk to the server, it will call this function.
-static void server_call(const rc_api_request_t* request,
-    rc_client_server_callback_t callback, void* callback_data, rc_client_t* client)
-{
-  // RetroAchievements may not allow hardcore unlocks if we don't properly identify ourselves.
-  const char* user_agent = "MyClient/1.2";
+static void server_call(const rc_api_request_t* request, rc_client_server_callback_t callback, void* callback_data, rc_client_t* client) {
+  int status_code;
+  const char* response = send_http_request(request->url, request->post_data, &status_code);
 
-  // callback must be called with callback_data, regardless of the outcome of the HTTP call.
-  // Since we're making the HTTP call asynchronously, we need to capture them and pass it
-  // through the async HTTP code.
-  async_callback_data* async_data = malloc(sizeof(async_callback_data));
-  async_data->callback = callback;
-  async_data->callback_data = callback_data;
+  rc_api_server_response_t server_response;
+  memset(&server_response, 0, sizeof(server_response));
+  server_response.http_status_code = status_code;
+  server_response.body = response;
 
-  // If post data is provided, we need to make a POST request, otherwise, a GET request will suffice.
-  if (request->post_data)
-    async_http_post(request->url, request->post_data, user_agent, http_callback, async_data);
-  else
-    async_http_get(request->url, user_agent, http_callback, async_data);
+  callback(&server_response, callback_data);
+
+  if (response) {
+  free((void*)response);
+  }
 }
+
 
 // Write log messages to the console
 static void log_message(const char* message, const rc_client_t* client)

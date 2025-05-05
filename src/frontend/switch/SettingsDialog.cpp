@@ -373,14 +373,18 @@ void DoGui(BoxGui::Frame& parent)
             if (loginRA) {
                 status = InitRetroAchievements(Config::RetroAchievementsUsername, Config::RetroAchievementsPassword);
                 if (status == 200) {
-                    printf("Login Success: %d", status);
+                    printf("Login Success: %d\n", status);
+                    fflush(stdout);
                     g_notification.Show("Login successful");
                 }
                 else {
-                    printf("Login failed: %d", status);
+                    printf("Login failed: %d\n", status);
+                    fflush(stdout);
                     g_notification.Show("Login failed");
                 }   
             }
+
+            g_notification.Render();
         }
         break;
     case uiScreen_DisplaySettings:
