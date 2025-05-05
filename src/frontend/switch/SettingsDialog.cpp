@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "RetroAchievements.h"
+#include "NotificationSystem.h"
 
 namespace SettingsDialog
 {
@@ -371,11 +372,13 @@ void DoGui(BoxGui::Frame& parent)
             DoCheckbox(settingsFrame, settingsSkewer, "Login", loginRA);
             if (loginRA) {
                 status = InitRetroAchievements(Config::RetroAchievementsUsername, Config::RetroAchievementsPassword);
-                if (status != 200) {
-                    DoCombobox(settingsFrame, settingsSkewer, "Login status", "Failed", Config::ConsoleType, true);
+                if (status == 200) {
+                    printf("Login Success: %d", status);
+                    g_notification.Show("Login successful");
                 }
                 else {
-                    DoCombobox(settingsFrame, settingsSkewer, "Login status", "Successs", Config::ConsoleType, true);
+                    printf("Login failed: %d", status);
+                    g_notification.Show("Login failed");
                 }   
             }
         }

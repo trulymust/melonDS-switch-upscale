@@ -9,11 +9,12 @@
 extern "C" {
     #include <rc_api_user.h>
     #include <rc_api_runtime.h>
+    #include <rc_client.h>
 }
 
     
-
 static std::string g_response;
+rc_client_t* g_client = NULL;
 
 static size_t switch_curl_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t realsize = size * nmemb;
@@ -58,12 +59,71 @@ const char* send_http_request(const char* url, const char* post_data, int* statu
     return response_cstr;
 }
 
+// This is the function the rc_client will use to read memory for the emulator. we don't need it yet,
+// so just provide a dummy function that returns "no memory read".
+
+static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client)
+{
+  // TODO: implement later
+  return 0;
+}
+
+// This is the HTTP request dispatcher that is provided to the rc_client. Whenever the client
+// needs to talk to the server, it will call this function.
+static void server_call(const rc_api_request_t* request,
+    rc_client_server_callback_t callback, void* callback_data, rc_client_t* client)
+{
+  // RetroAchievements may not allow hardcore unlocks if we don't properly identify ourselves.
+  const char* user_agent = "MyClient/1.2";
+
+  // callback must be called with callback_data, regardless of the outcome of the HTTP call.
+  // Since we're making the HTTP call asynchronously, we need to capture them and pass it
+  // through the async HTTP code.
+  async_callback_data* async_data = malloc(sizeof(async_callback_data));
+  async_data->callback = callback;
+  async_data->callback_data = callback_data;
+
+  // If post data is provided, we need to make a POST request, otherwise, a GET request will suffice.
+  if (request->post_data)
+    async_http_post(request->url, request->post_data, user_agent, http_callback, async_data);
+  else
+    async_http_get(request->url, user_agent, http_callback, async_data);
+}
+
+// Write log messages to the console
+static void log_message(const char* message, const rc_client_t* client)
+{
+  printf("%s\n", message);
+}
+
+void initialize_retroachievements_client(void)
+{
+  // Create the client instance (using a global variable simplifies this example)
+  g_client = rc_client_create(read_memory, server_call);
+
+  // Provide a logging function to simplify debugging
+  rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_VERBOSE, log_message);
+
+  // Disable hardcore - if we goof something up in the implementation, we don't want our
+  // account disabled for cheating.
+  rc_client_set_hardcore_enabled(g_client, 0);
+}
+
+void shutdown_retroachievements_client(void)
+{
+  if (g_client)
+  {
+    // Release resources associated to the client instance
+    rc_client_destroy(g_client);
+    g_client = NULL;
+  }  
+}
+
 int InitRetroAchievements(const char* username, const char* password) {
     rc_api_login_request_t api_params;
     memset(&api_params, 0, sizeof(api_params));
 
     api_params.username = username;
-    // api_params.api_token = "PsyVsTzJE2eJBs8BikiXVzu2aCCrXQo7";
     api_params.password = password;
 
     rc_api_request_t api_request;

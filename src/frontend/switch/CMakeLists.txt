@@ -17,6 +17,7 @@ SET(SOURCES_SWITCH
     GpuMemHeap.cpp
     UploadBuffer.cpp
     RetroAchievements.cpp
+    NotificationSystem.cpp
     ../Util_ROM.cpp
     ../Util_Audio.cpp
     ../Util_Video.cpp
