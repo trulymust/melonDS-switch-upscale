@@ -811,6 +811,8 @@ std::string GetLoadErrorStr(int error)
 
 void LoadROM(const char* file)
 {
+    printf("Loading ROM...\n");
+    fflush(stdout);
     Overclocking::ApplyOverclock(Config::SwitchOverclock);
 
     assert(State == emuState_Nothing);
@@ -825,6 +827,8 @@ void LoadROM(const char* file)
         StateAtomic = State;
         CurrentUiScreen = uiScreen_Start;
     }
+
+    load_game_from_file(file);
 }
 
 void LoadBIOS()

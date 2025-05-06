@@ -7,16 +7,23 @@
 #include <cstring>
 #include <cstdlib>
 #include "NotificationSystem.h"
+
+#define RC_CLIENT_SUPPORTS_HASH
+
 extern "C" {
     #include <rc_api_user.h>
     #include <rc_api_runtime.h>
     #include <rc_client.h>
+    #include <rc_consoles.h>
 }
 
     
 static std::string g_response;
 rc_client_t* g_client = NULL;
 static bool g_login_successful = false;
+
+
+/* -------------- SERVER COMUNICATION --------------*/
 
 static size_t switch_curl_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t realsize = size * nmemb;
@@ -117,12 +124,11 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
     return;
   }
 
-  // Login was successful. Capture the token for future logins so we don't have to store the password anywhere.
   const rc_client_user_t* user = rc_client_get_user_info(client);
   // TODO store_retroachievements_credentials(user->username, user->token);
 
   // TODO Inform user of successful login
-  printf("DEBUG: Successful login. \nLogged in as %s (%u points)\n", user->display_name, user->score);
+  printf("DEBUG: Successful login. \n Logged in as %s (%u points)\n", user->display_name, user->score);
   fflush(stdout);
   g_notification.Render();
 }
@@ -133,6 +139,81 @@ void login_retroachievements_user(const char* username, const char* password)
   // Eventually, login_callback will be called to let us know if the login was successful.
   rc_client_begin_login_with_password(g_client, username, password, login_callback, NULL);
 }
+
+/* -------------- STARTING GAME SESSION --------------*/
+
+static void show_game_placard(void)
+{
+  char message[128], url[128];
+  // async_image_data* image_data = NULL;
+  const rc_client_game_t* game = rc_client_get_game_info(g_client);
+  rc_client_user_game_summary_t summary;
+  rc_client_get_user_game_summary(g_client, &summary);
+
+  // Construct a message indicating the number of achievements unlocked by the user.
+  if (summary.num_core_achievements == 0)
+  {
+    printf("This game has no achievements.\n");
+    fflush(stdout);
+  }
+  else if (summary.num_unsupported_achievements)
+  {
+    printf("You have %u of %u achievements unlocked (%d unsupported).\n",
+        summary.num_unlocked_achievements, summary.num_core_achievements,
+        summary.num_unsupported_achievements);
+    fflush(stdout);
+  }
+  else
+  {
+    printf("You have %u of %u achievements unlocked.", summary.num_unlocked_achievements, summary.num_core_achievements);
+    fflush(stdout);
+  }
+
+  // The emulator is responsible for managing images. This uses rc_client to build
+  // the URL where the image should be downloaded from.
+  /*      TO DO      
+  if (rc_client_game_get_image_url(game, url, sizeof(url)) == RC_OK)
+  {
+    // Generate a local filename to store the downloaded image.
+    char game_badge[64];
+    snprintf(game_badge, sizeof(game_badge), "game_%s.png", game->badge_name);
+
+    // This function will download and cache the game image. It is up to the emulator
+    // to implement this logic. Similarly, the emulator has to use image_data to
+    // display the game badge in the placard, or a placeholder until the image is
+    // downloaded. None of that logic is provided in this example.
+    image_data = download_and_cache_image(game_badge, url);
+  }
+  */
+
+  // show_popup_message(image_data, game->title, message);
+}
+
+static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
+{
+  printf("RetroAchievements game loaded, result: %d", result);
+  fflush(stdout);
+  if (result != RC_OK)
+  {
+    printf("RetroAchievements game load failed: %s\nResult: %d", error_message, result);
+    fflush(stdout);
+    return;
+  }
+
+  // announce that the game is ready. we'll cover this in the next section.
+  show_game_placard();
+}
+
+void load_game_from_file(const char* path)
+{
+  printf("RetroAchievements game loading...\n");
+  fflush(stdout);
+  rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_NINTENDO_DS, 
+      path, NULL, 0, load_game_callback, NULL);
+}
+
+
+/* -------------- INITIALIZATION --------------*/
 
 int InitRetroAchievements(const char* username, const char* password) {
   initialize_retroachievements_client();

@@ -63,6 +63,7 @@ SET(SOURCES_SWITCH
 include(${CMAKE_SOURCE_DIR}/cmake/Toolchain-cross-Switch.cmake)
 
 add_executable(melonDS.elf ${SOURCES_SWITCH})
+target_compile_definitions(melonDS.elf PRIVATE RC_CLIENT_SUPPORTS_HASH)
 if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
     if (ENABLE_LTO)
         target_link_libraries(melonDS.elf nxd deko3dd core nx)
@@ -89,7 +90,6 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/control.nacp
                    COMMAND ${NACPTOOL} --create "melonDS switch fast alpha" "Arisotura, RSDuck, Hydr8gon, Jpe230, Gheovgos" "release 7" ${CMAKE_BINARY_DIR}/control.nacp)
 
 make_directory(${CMAKE_BINARY_DIR}/romfs/shaders)
-
 configure_file(${CMAKE_SOURCE_DIR}/icon/melon_128x128.png ${CMAKE_BINARY_DIR}/romfs/melon_128x128.png COPYONLY)
 
 compile_shader(vert Default_vsh)
