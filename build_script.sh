@@ -7,3 +7,5 @@ cd build
 make clean && cd .. && rm -rf build && mkdir build && cd build
 cmake .. -DENABLE_OGLRENDERER=OFF -DBUILD_QT_SDL=OFF -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-Switch.cmake
 make -j$(nproc --all) 
+sleep 3
+cp /home/gheovgos/VSCode/melonDS/build/melonDS.nro /home/gheovgos/melonds-switch/
