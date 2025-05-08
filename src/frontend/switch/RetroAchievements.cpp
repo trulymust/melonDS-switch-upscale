@@ -6,9 +6,11 @@
 #include <stdlib.h>
 #include <cstring>
 #include <cstdlib>
+#include "stb_image/stb_image.h"
+#include "ROMMetaDatabase.h"
 #include "NotificationSystem.h"
 
-#define RC_CLIENT_SUPPORTS_HASH
+#define STB_IMAGE_IMPLEMENTATION
 
 extern "C" {
     #include <rc_api_user.h>
@@ -29,6 +31,80 @@ static size_t switch_curl_write_callback(void* contents, size_t size, size_t nme
     size_t realsize = size * nmemb;
     g_response.append((char*)contents, realsize);
     return realsize;
+}
+
+static size_t switch_curl_write_image_callback(void* contents, size_t size, size_t nmemb, void* userp) {
+  size_t realsize = size * nmemb;
+  std::vector<unsigned char>* image_data = static_cast<std::vector<unsigned char>*>(userp);
+  image_data->insert(image_data->end(), (unsigned char*)contents, (unsigned char*)contents + realsize);
+  return realsize;
+}
+
+
+// This for download icons from rcheevos APIs
+Gfx::PackedQuad* DownloadAndPackAvatar(const char* url) {
+  CURL* curl = curl_easy_init();
+  if (!curl)
+      return nullptr;
+
+  printf("DEBUG: inside downloadandpackavatar\n");
+  fflush(stdout);
+  
+  std::vector<unsigned char> image_data;
+
+  printf("DEBUG: image_data initialized\n");
+  fflush(stdout);
+
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, switch_curl_write_image_callback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &image_data);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); 
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+
+  printf("DEBUG: curl settings: %s\n", url);
+  fflush(stdout);
+
+  CURLcode res = curl_easy_perform(curl);
+  curl_easy_cleanup(curl);
+  printf("DEBUG: curl for image result: %d\n", res);
+  fflush(stdout);
+
+  if (res != CURLE_OK || image_data.empty()) {
+    printf("DEBUG: curl not OK or image data is empty. Returning null.");
+    fflush(stdout);
+    return nullptr;
+  }
+
+  int width, height, channels;
+  unsigned char* pixels = stbi_load_from_memory(image_data.data(), image_data.size(), &width, &height, &channels, 4);
+  if (!pixels)
+      return nullptr;
+    
+  printf("DEBUG: pixels loaded.\n");
+  fflush(stdout);
+
+  Gfx::PackedQuad* quad = new Gfx::PackedQuad();
+  u8* dest = ROMMetaDatabase::IconAtlas.Pack(width, height, *quad);
+
+  printf("DEBUG: packed quad obtained\n");
+  fflush(stdout);
+
+  if (!dest) {
+    printf("DEBUG: no dest for image");
+    fflush(stdout);
+    stbi_image_free(pixels);
+    delete quad;
+    return nullptr;
+  }
+
+  for (int y = 0; y < height; ++y)
+      memcpy(dest + y * ROMMetaDatabase::IconAtlas.PackStride(), pixels + y * width * 4, width * 4);
+
+  printf("DEBUG: memcpy successful\n");
+  fflush(stdout);
+
+  stbi_image_free(pixels);
+  return quad;
 }
 
 const char* send_http_request(const char* url, const char* post_data, int* status_code) {
@@ -125,11 +201,22 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
   }
 
   const rc_client_user_t* user = rc_client_get_user_info(client);
-  // TODO store_retroachievements_credentials(user->username, user->token);
-
-  // TODO Inform user of successful login
-  printf("DEBUG: Successful login. \n Logged in as %s (%u points)\n", user->display_name, user->score);
+  printf("DEBUG: rc_client obtained. Downloading avatar..\n");
   fflush(stdout);
+  if (user->avatar_url) {
+    printf("DEBUG: avatar obtained: %s\n", user->avatar_url);
+    fflush(stdout);
+    Gfx::PackedQuad* avatarQuad = DownloadAndPackAvatar(user->avatar_url);
+    if (!avatarQuad) {
+      printf("DEBUG: avatar quad is null.\n");
+      fflush(stdout);
+    }
+    g_notification.ShowWithIcon(avatarQuad, "Welcome %s (%u points)", user->display_name, user->score);
+    g_notification.Render();
+    return;
+  }
+  // TODO store_retroachievements_credentials(user->username, user->token);
+  g_notification.Show("Welcome %s (%u points)", user->display_name, user->score);
   g_notification.Render();
 }
 
@@ -165,7 +252,7 @@ static void show_game_placard(void)
   }
   else
   {
-    printf("You have %u of %u achievements unlocked.", summary.num_unlocked_achievements, summary.num_core_achievements);
+    printf("You have %u of %u achievements unlocked.\n", summary.num_unlocked_achievements, summary.num_core_achievements);
     fflush(stdout);
   }
 
@@ -191,7 +278,7 @@ static void show_game_placard(void)
 
 static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {
-  printf("RetroAchievements game loaded, result: %d", result);
+  printf("RetroAchievements game loaded, result: %d\n", result);
   fflush(stdout);
   if (result != RC_OK)
   {
@@ -206,7 +293,7 @@ static void load_game_callback(int result, const char* error_message, rc_client_
 
 void load_game_from_file(const char* path)
 {
-  printf("RetroAchievements game loading...\n");
+  printf("RetroAchievements game loading: %s\n", path);
   fflush(stdout);
   rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_NINTENDO_DS, 
       path, NULL, 0, load_game_callback, NULL);

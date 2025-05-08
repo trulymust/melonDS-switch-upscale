@@ -372,12 +372,6 @@ void DoGui(BoxGui::Frame& parent)
             DoCheckbox(settingsFrame, settingsSkewer, "Login", loginRA);
             if (loginRA) {
                 status = InitRetroAchievements(Config::RetroAchievementsUsername, Config::RetroAchievementsPassword);
-                if (status == 200) {
-                    g_notification.Show("Login successful");
-                }
-                else {
-                    g_notification.Show("Login failed");
-                }   
             }
 
             g_notification.Render();
