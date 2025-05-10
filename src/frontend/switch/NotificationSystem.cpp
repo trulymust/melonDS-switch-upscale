@@ -15,10 +15,9 @@ void Notification::Show(const char* fmt, ...) {
     message = buffer;
     active = true;
     startTime = time(nullptr);
-    icon = nullptr;
 }
 
-void Notification::ShowWithIcon(const Gfx::PackedQuad* iconPtr, const char* fmt, ...) {
+void Notification::ShowWithIcon(int texId, int width, int height, const char* fmt, ...) {
     char buffer[256];
     va_list args;
     va_start(args, fmt);
@@ -26,7 +25,9 @@ void Notification::ShowWithIcon(const Gfx::PackedQuad* iconPtr, const char* fmt,
     va_end(args);
 
     message = buffer;
-    icon = iconPtr;
+    textureId = texId;
+    nwidth = width;
+    nheight = height;
     active = true;
     startTime = time(nullptr);
 }
@@ -47,16 +48,24 @@ void Notification::Render() {
 
     Gfx::Vector2f textOffset = position + Gfx::Vector2f{10.f, 25.f};
 
-    if (icon) {
+    if (textureId >= 0) {
+        Gfx::Vector2f avatarPos = position + Gfx::Vector2f{5.f, 5.f};
+        Gfx::Vector2f maxSize = {40.f, 40.f};
+    
+        float scale = std::min(maxSize.X / nwidth, maxSize.Y / nheight);
+        Gfx::Vector2f avatarSize = {nwidth * scale, nheight * scale};
+    
         Gfx::DrawRectangle(
-            icon->AtlasTexture,
-            position + Gfx::Vector2f{5.f, 5.f},
-            {40.f, 40.f},
-            {static_cast<float>(icon->PackX), static_cast<float>(icon->PackY)},
+            textureId,
+            avatarPos,
+            avatarSize,
+            {0.f, 0.f}, {static_cast<float>(nwidth), static_cast<float>(nheight)},
             WidgetColorBright
         );
-        textOffset.X += 50.f;
-    } else {
+    
+        textOffset.X += avatarSize.X + 10.f;
+    }
+    else {
         printf("DEBUG: Notification System: icon is null\n");
         fflush(stdout);
     }

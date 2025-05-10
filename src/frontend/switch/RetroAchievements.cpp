@@ -42,10 +42,10 @@ static size_t switch_curl_write_image_callback(void* contents, size_t size, size
 
 
 // This for download icons from rcheevos APIs
-Gfx::PackedQuad* DownloadAndPackAvatar(const char* url) {
+int DownloadAndPackAvatar(const char* url,  int* outWidth, int* outHeight) {
   CURL* curl = curl_easy_init();
   if (!curl)
-      return nullptr;
+      return -1;
 
   printf("DEBUG: inside downloadandpackavatar\n");
   fflush(stdout);
@@ -72,39 +72,24 @@ Gfx::PackedQuad* DownloadAndPackAvatar(const char* url) {
   if (res != CURLE_OK || image_data.empty()) {
     printf("DEBUG: curl not OK or image data is empty. Returning null.");
     fflush(stdout);
-    return nullptr;
+    return -1;
   }
 
   int width, height, channels;
   unsigned char* pixels = stbi_load_from_memory(image_data.data(), image_data.size(), &width, &height, &channels, 4);
   if (!pixels)
-      return nullptr;
+      return -1;
+
+  *outWidth = width;
+  *outHeight = height;
     
   printf("DEBUG: pixels loaded.\n");
   fflush(stdout);
 
-  Gfx::PackedQuad* quad = new Gfx::PackedQuad();
-  u8* dest = ROMMetaDatabase::IconAtlas.Pack(width, height, *quad);
-
-  printf("DEBUG: packed quad obtained\n");
-  fflush(stdout);
-
-  if (!dest) {
-    printf("DEBUG: no dest for image");
-    fflush(stdout);
-    stbi_image_free(pixels);
-    delete quad;
-    return nullptr;
-  }
-
-  for (int y = 0; y < height; ++y)
-      memcpy(dest + y * ROMMetaDatabase::IconAtlas.PackStride(), pixels + y * width * 4, width * 4);
-
-  printf("DEBUG: memcpy successful\n");
-  fflush(stdout);
-
+  int textureId = Gfx::TextureCreate(width, height, DkImageFormat_RGBA8_Unorm);
+  Gfx::TextureUpload(textureId, 0, 0, width, height, pixels, width * 4);
   stbi_image_free(pixels);
-  return quad;
+  return textureId;
 }
 
 const char* send_http_request(const char* url, const char* post_data, int* status_code) {
@@ -201,17 +186,19 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
   }
 
   const rc_client_user_t* user = rc_client_get_user_info(client);
+  int avatarTexture = -1;
+  int texWidth = 0, texHeight = 0;
+
   printf("DEBUG: rc_client obtained. Downloading avatar..\n");
   fflush(stdout);
   if (user->avatar_url) {
     printf("DEBUG: avatar obtained: %s\n", user->avatar_url);
     fflush(stdout);
-    Gfx::PackedQuad* avatarQuad = DownloadAndPackAvatar(user->avatar_url);
-    if (!avatarQuad) {
-      printf("DEBUG: avatar quad is null.\n");
-      fflush(stdout);
-    }
-    g_notification.ShowWithIcon(avatarQuad, "Welcome %s (%u points)", user->display_name, user->score);
+
+    avatarTexture = DownloadAndPackAvatar(user->avatar_url,  &texWidth, &texHeight);
+    printf("DEBUG: Showing ShowWithIcon: %d\n", avatarTexture);
+    fflush(stdout);
+    g_notification.ShowWithIcon(avatarTexture, texWidth, texHeight, "Welcome %s (%u points)", user->display_name, user->score);
     g_notification.Render();
     return;
   }

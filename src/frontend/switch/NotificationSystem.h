@@ -9,10 +9,12 @@ struct Notification {
     std::string message;
     time_t startTime = 0;
     int durationSeconds = 3;
-    const Gfx::PackedQuad* icon = nullptr;
+    int textureId = -1;
+    int nwidth = 0;
+    int nheight = 0;
 
     void Show(const char* fmt, ...);
-    void ShowWithIcon(const Gfx::PackedQuad* icon, const char* fmt, ...);
+    void ShowWithIcon(int texId, int width, int height, const char* fmt, ...);
 
     void Render();
 };
