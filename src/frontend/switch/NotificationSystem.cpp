@@ -38,6 +38,7 @@ void Notification::Render() {
 
     if (difftime(time(nullptr), startTime) > durationSeconds) {
         active = false;
+        textureId = -1;
         return;
     }
 

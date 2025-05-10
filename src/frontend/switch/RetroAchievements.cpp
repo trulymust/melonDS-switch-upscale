@@ -46,14 +46,8 @@ int DownloadAndPackAvatar(const char* url,  int* outWidth, int* outHeight) {
   CURL* curl = curl_easy_init();
   if (!curl)
       return -1;
-
-  printf("DEBUG: inside downloadandpackavatar\n");
-  fflush(stdout);
   
   std::vector<unsigned char> image_data;
-
-  printf("DEBUG: image_data initialized\n");
-  fflush(stdout);
 
   curl_easy_setopt(curl, CURLOPT_URL, url);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, switch_curl_write_image_callback);
@@ -61,19 +55,11 @@ int DownloadAndPackAvatar(const char* url,  int* outWidth, int* outHeight) {
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); 
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 
-  printf("DEBUG: curl settings: %s\n", url);
-  fflush(stdout);
-
   CURLcode res = curl_easy_perform(curl);
   curl_easy_cleanup(curl);
-  printf("DEBUG: curl for image result: %d\n", res);
-  fflush(stdout);
 
-  if (res != CURLE_OK || image_data.empty()) {
-    printf("DEBUG: curl not OK or image data is empty. Returning null.");
-    fflush(stdout);
+  if (res != CURLE_OK || image_data.empty())
     return -1;
-  }
 
   int width, height, channels;
   unsigned char* pixels = stbi_load_from_memory(image_data.data(), image_data.size(), &width, &height, &channels, 4);
@@ -82,13 +68,11 @@ int DownloadAndPackAvatar(const char* url,  int* outWidth, int* outHeight) {
 
   *outWidth = width;
   *outHeight = height;
-    
-  printf("DEBUG: pixels loaded.\n");
-  fflush(stdout);
 
   int textureId = Gfx::TextureCreate(width, height, DkImageFormat_RGBA8_Unorm);
   Gfx::TextureUpload(textureId, 0, 0, width, height, pixels, width * 4);
   stbi_image_free(pixels);
+
   return textureId;
 }
 
@@ -107,8 +91,6 @@ const char* send_http_request(const char* url, const char* post_data, int* statu
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, nullptr);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); 
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L); 
-    printf("DEBUG: Send HTTP request values: %s\n%s\n", url, post_data);
-    fflush(stdout);
 
     CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
@@ -149,9 +131,6 @@ static void server_call(const rc_api_request_t* request, rc_client_server_callba
 
   callback(&server_response, callback_data);
 
-  printf("DEBUG: server_call values: %d\n%s\n", server_response.http_status_code, server_response.body);
-  fflush(stdout);
-
   if (response) {
   free((void*)response);
   }
@@ -176,8 +155,6 @@ void shutdown_retroachievements_client(void)
 
 static void login_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {
-  printf("DEBUG: login results: %d\n%s\n", result, error_message);
-  fflush(stdout);
   if (result != RC_OK)
   {
     printf("DEBUG: login failed. Status: %d\n%s\n", result, error_message);
@@ -189,22 +166,14 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
   int avatarTexture = -1;
   int texWidth = 0, texHeight = 0;
 
-  printf("DEBUG: rc_client obtained. Downloading avatar..\n");
-  fflush(stdout);
   if (user->avatar_url) {
-    printf("DEBUG: avatar obtained: %s\n", user->avatar_url);
-    fflush(stdout);
-
     avatarTexture = DownloadAndPackAvatar(user->avatar_url,  &texWidth, &texHeight);
-    printf("DEBUG: Showing ShowWithIcon: %d\n", avatarTexture);
-    fflush(stdout);
+
     g_notification.ShowWithIcon(avatarTexture, texWidth, texHeight, "Welcome %s (%u points)", user->display_name, user->score);
-    g_notification.Render();
     return;
   }
   // TODO store_retroachievements_credentials(user->username, user->token);
   g_notification.Show("Welcome %s (%u points)", user->display_name, user->score);
-  g_notification.Render();
 }
 
 void login_retroachievements_user(const char* username, const char* password)
@@ -245,22 +214,23 @@ static void show_game_placard(void)
 
   // The emulator is responsible for managing images. This uses rc_client to build
   // the URL where the image should be downloaded from.
-  /*      TO DO      
+
   if (rc_client_game_get_image_url(game, url, sizeof(url)) == RC_OK)
   {
-    // Generate a local filename to store the downloaded image.
-    char game_badge[64];
-    snprintf(game_badge, sizeof(game_badge), "game_%s.png", game->badge_name);
+    int width, height;
+    int textureId = DownloadAndPackAvatar(url, &width, &height);
 
-    // This function will download and cache the game image. It is up to the emulator
-    // to implement this logic. Similarly, the emulator has to use image_data to
-    // display the game badge in the placard, or a placeholder until the image is
-    // downloaded. None of that logic is provided in this example.
-    image_data = download_and_cache_image(game_badge, url);
+    if (textureId >= 0) {
+      // g_notification.ShowWithIcon(textureId, width, height, "%s\n%s", game->title, message);
+      g_notification.Show("%s\n%s", game->title, message);   // TEST ONLY
+    } else {
+      g_notification.Show("%s\n%s", game->title, message);
+    }
   }
-  */
+  else {
+    g_notification.Show("%s\n%s", game->title, message);
+  }
 
-  // show_popup_message(image_data, game->title, message);
 }
 
 static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata)

@@ -34,6 +34,7 @@
 #include <string.h>
 
 #include "RetroAchievements.h"
+#include "NotificationSystem.h"
 
 bool Done = false;
 int CurrentUiScreen = uiScreen_Start;
@@ -712,6 +713,8 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
                 ScreenPoints[i][2], ScreenPoints[i][3],
                 {0.f, 0.f}, {256.f, 192.f});
         }
+        g_notification.Render();
+        
         Gfx::SignalFence(((GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get())->FramebufferPresented[GPU::FrontBuffer]);
     }
 
