@@ -998,8 +998,6 @@ int main(int argc, const char* argv[])
     Frontend::Init_ROM();
     Emulation::Init();
 
-    g_notification.Render();
-
     bool argvLoaded = false;
 
     while (appletMainLoop() && !Done)
@@ -1056,7 +1054,7 @@ int main(int argc, const char* argv[])
             KeyExplanation::Reset();
 
         BoxGui::Update(rootFrame, keysDown, keysUp);
-        g_notification.Update();
+        g_notification.Render();
 
         Gfx::PopScissor();
 

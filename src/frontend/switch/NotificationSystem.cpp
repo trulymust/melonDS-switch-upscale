@@ -62,38 +62,36 @@ void Notification::Render() {
     Gfx::Vector2f textOffset = position + Gfx::Vector2f{10.f, 25.f};
 
     if (textureId >= 0) {
-        Gfx::Vector2f avatarPos = position + Gfx::Vector2f{5.f, 5.f};
-        Gfx::Vector2f maxSize = {40.f, 40.f};
-    
-        float scale = std::min(maxSize.X / nwidth, maxSize.Y / nheight);
-        Gfx::Vector2f avatarSize = {nwidth * scale, nheight * scale};
-    
-        Gfx::DrawRectangle(
-            textureId,
-            avatarPos,
-            avatarSize,
-            {0.f, 0.f}, {static_cast<float>(nwidth), static_cast<float>(nheight)},
-            WidgetColorBright
-        );
-    
-        textOffset.X += avatarSize.X + 10.f;
-    }
-    else {
+        if (nwidth > 0 && nheight > 0) {
+            Gfx::Vector2f avatarPos = position + Gfx::Vector2f{5.f, 5.f};
+            Gfx::Vector2f maxSize = {40.f, 40.f};
+
+            float scale = std::min(maxSize.X / nwidth, maxSize.Y / nheight);
+            Gfx::Vector2f avatarSize = {nwidth * scale, nheight * scale};
+
+            Gfx::DrawRectangle(
+                textureId,
+                avatarPos,
+                avatarSize,
+                {0.f, 0.f}, {static_cast<float>(nwidth), static_cast<float>(nheight)},
+                WidgetColorBright
+            );
+
+            textOffset.X += avatarSize.X + 10.f;
+        } else {
+            printf("DEBUG: Invalid avatar dimensions: nwidth=%d, nheight=%d\n", nwidth, nheight);
+            fflush(stdout);
+        }
+    } else {
         printf("DEBUG: Notification System: icon is null\n");
         fflush(stdout);
     }
 
-    Gfx::DrawText(Gfx::SystemFontStandard, textOffset, TextLineHeight, DarkColor,
-                  Gfx::align_Left, Gfx::align_Center, message.c_str());
-}
-
-void Notification::Update() {
-    if (!active)
-        return;
-
-    double elapsed = std::difftime(std::time(nullptr), startTime);
-    if (elapsed > durationSeconds) {
-        active = false;
-        DestroyNotification();
+    if (!message.empty()) {
+        Gfx::DrawText(Gfx::SystemFontStandard, textOffset, TextLineHeight, DarkColor,
+                      Gfx::align_Left, Gfx::align_Center, message.c_str());
+    } else {
+        printf("DEBUG: Notification message is empty\n");
+        fflush(stdout);
     }
 }

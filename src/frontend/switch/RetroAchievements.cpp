@@ -187,7 +187,7 @@ void login_retroachievements_user(const char* username, const char* password)
 
 static void show_game_placard(void)
 {
-  char message[128], url[128];
+  char url[128];
   // async_image_data* image_data = NULL;
   const rc_client_game_t* game = rc_client_get_game_info(g_client);
   rc_client_user_game_summary_t summary;
@@ -219,16 +219,17 @@ static void show_game_placard(void)
   {
     int width, height;
     int textureId = DownloadAndPackAvatar(url, &width, &height);
-
+    printf("DEBUG: values: %d  %d %d \n", width, height, textureId);
+    fflush(stdout);
+    
     if (textureId >= 0) {
-      // g_notification.ShowWithIcon(textureId, width, height, "%s\n%s", game->title, message);
-      g_notification.Show("%s\n%s", game->title, message);   // TEST ONLY
+      g_notification.ShowWithIcon(textureId, width, height, "%s\n%s", game->title);
     } else {
-      g_notification.Show("%s\n%s", game->title, message);
+      g_notification.Show("%s\n%s", game->title);
     }
   }
   else {
-    g_notification.Show("%s\n%s", game->title, message);
+    g_notification.Show("%s\n%s", game->title);
   }
 
 }
