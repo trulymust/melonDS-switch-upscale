@@ -16,8 +16,10 @@ struct Notification {
     void Show(const char* fmt, ...);
     void ShowWithIcon(int texId, int width, int height, const char* fmt, ...);
 
+    void Update();
     void Render();
 };
 
 extern Notification g_notification;
     
+void DestroyNotification();

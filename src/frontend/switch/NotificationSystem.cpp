@@ -17,6 +17,17 @@ void Notification::Show(const char* fmt, ...) {
     startTime = time(nullptr);
 }
 
+void DestroyNotification() {
+    printf("DEBUG: Destroy called\n");
+    fflush(stdout);
+    if (g_notification.textureId != -1) {
+        Gfx::TextureDelete(g_notification.textureId);
+        g_notification.textureId = -1;
+        printf("DEBUG: Destroyed\n");
+        fflush(stdout);
+    }
+}
+
 void Notification::ShowWithIcon(int texId, int width, int height, const char* fmt, ...) {
     char buffer[256];
     va_list args;
@@ -39,6 +50,7 @@ void Notification::Render() {
     if (difftime(time(nullptr), startTime) > durationSeconds) {
         active = false;
         textureId = -1;
+        DestroyNotification();
         return;
     }
 
@@ -73,4 +85,15 @@ void Notification::Render() {
 
     Gfx::DrawText(Gfx::SystemFontStandard, textOffset, TextLineHeight, DarkColor,
                   Gfx::align_Left, Gfx::align_Center, message.c_str());
+}
+
+void Notification::Update() {
+    if (!active)
+        return;
+
+    double elapsed = std::difftime(std::time(nullptr), startTime);
+    if (elapsed > durationSeconds) {
+        active = false;
+        DestroyNotification();
+    }
 }

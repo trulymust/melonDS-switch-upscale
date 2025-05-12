@@ -373,8 +373,6 @@ void DoGui(BoxGui::Frame& parent)
             if (loginRA) {
                 status = InitRetroAchievements(Config::RetroAchievementsUsername, Config::RetroAchievementsPassword);
             }
-
-            g_notification.Render();
         }
         break;
     case uiScreen_DisplaySettings:

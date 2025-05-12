@@ -713,7 +713,6 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
                 ScreenPoints[i][2], ScreenPoints[i][3],
                 {0.f, 0.f}, {256.f, 192.f});
         }
-        g_notification.Render();
         
         Gfx::SignalFence(((GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get())->FramebufferPresented[GPU::FrontBuffer]);
     }
@@ -976,7 +975,6 @@ int main(int argc, const char* argv[])
     appletHook(&aptCookie, OnAppletHook, NULL);
 
     Config::Load();
-    // InitRetroAchievements();
     
     strcpy(Config::FirmwarePath, "firmware.bin");
     strcpy(Config::BIOS9Path, "bios9.bin");
@@ -999,6 +997,8 @@ int main(int argc, const char* argv[])
 
     Frontend::Init_ROM();
     Emulation::Init();
+
+    g_notification.Render();
 
     bool argvLoaded = false;
 
@@ -1056,6 +1056,7 @@ int main(int argc, const char* argv[])
             KeyExplanation::Reset();
 
         BoxGui::Update(rootFrame, keysDown, keysUp);
+        g_notification.Update();
 
         Gfx::PopScissor();
 
