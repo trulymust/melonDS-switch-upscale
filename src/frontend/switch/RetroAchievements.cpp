@@ -132,17 +132,66 @@ static void server_call(const rc_api_request_t* request, rc_client_server_callba
 }
 
 /* -------------- LOGIC PROCESSING AND MEMORY --------------*/
+static void achievement_triggered(const rc_client_achievement_t* achievement)
+{
+  char url[128];
+  const char* message = "Achievement Unlocked";
+
+  // the runtime already took care of dispatching the server request to notify the
+  // server, we just have to tell the player.
+
+  if (rc_client_achievement_get_image_url(achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED, url, sizeof(url)) == RC_OK) {
+    int width, height;
+    int textureId = DownloadAndPackAvatar(url, &width, &height);
+    
+    if (textureId >= 0) {
+      g_notification.ShowWithIcon(textureId, width, height, "%s\n%s", message, achievement->title);
+    } else {
+      g_notification.Show("%s\n%s", message, achievement->title);
+    }
+  } else {
+    g_notification.Show("%s\n%s", message, achievement->title);
+  }
+
+  // it's nice to also give an audio cue when an achievement is unlocked
+  // TODO LATER play_sound("unlock.wav");
+}
+
 
 static void event_handler(const rc_client_event_t* event, rc_client_t* client)
 {
-  printf("RA: Event! (%d)\n", event->type);
-  fflush(stdout);
+    switch (event->type)
+    {
+        case RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED:
+            printf("RA: Achievement triggered: %s\n", event->achievement->title);
+            achievement_triggered(event->achievement);
+            break;
+
+        default:
+            printf("RA: Unhandled event (%d)\n", event->type);
+            break;
+    }
+
+    fflush(stdout);
 }
+
 
 static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client)
 {
     printf("RA: Trying to read %u bytes at 0x%08X\n", num_bytes, address);
     fflush(stdout);
+
+    // "low" 0x00100000 – 0x01FFFFFF
+    if ((address >= 0x00100000) && (address < 0x02000000)) {
+        for (uint32_t i = 0; i < num_bytes; ++i)
+        {
+            uint32_t addr = address + i;
+            uint32_t offset = addr & NDS::MainRAMMask;
+            buffer[i] = NDS::MainRAM[offset];
+        }
+        return num_bytes;
+    }
+
     for (uint32_t i = 0; i < num_bytes; ++i)
     {
         buffer[i] = NDS::ARM9Read8(address + i);
@@ -151,10 +200,9 @@ static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_byte
     return num_bytes;
 }
 
+
 void rc_client_process_ra() {
   rc_client_do_frame(g_client);
-  printf("RA: Frame processed\n");
-  fflush(stdout);
 }
 
 void initialize_retroachievements_client(void)
