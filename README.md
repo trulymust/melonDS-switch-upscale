@@ -48,6 +48,7 @@ This guide assumes that you already set up your build enviroment for the Nintend
 ```bash
 sudo apt update
 sudo apt install cmake ninja meson bison flex
+sudo dkp-pacman -Syu curl
 ```
 
 2. Compile dekotools:
@@ -78,6 +79,7 @@ sudo cp ./lib/libdeko3dd.a $DEVKITPRO/libnx/lib/
 cd ~/
 git clone https://github.com/RSDuck/melonDS 
 cd melonDS
+git submodule update --init --recursive
 mkdir build && cd build
 ```
 5. Compile:
@@ -86,11 +88,12 @@ cmake .. -DENABLE_OGLRENDERER=OFF -DBUILD_QT_SDL=OFF -DCMAKE_TOOLCHAIN_FILE=../c
 make -j$(nproc --all)
 ```
 
-You can also use the build script (build_script.sh) to build the .nro file. It just wipe the build directory for a clean build, then execute the commands above.
+You can also use the build script (build_script.sh) to build the .nro file after a first build. It just wipe the build directory for a clean build, then execute the commands above.
    
 ## TODO LIST
- > RetroAchievements support (currently developing)
- * DSi emulation
+ + RetroAchievements support (currently developing)
+ * (Fix) DSi emulation
+ * Mic Support
  * the impossible quest of pixel-perfect 3D graphics
  * improve libui and the emulator UI
  * support for rendering screens to separate windows
