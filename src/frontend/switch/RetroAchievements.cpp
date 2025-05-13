@@ -9,6 +9,7 @@
 #include "stb_image/stb_image.h"
 #include "ROMMetaDatabase.h"
 #include "NotificationSystem.h"
+#include "NDS.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -113,12 +114,6 @@ const char* send_http_request(const char* url, const char* post_data, int* statu
     return response_cstr;
 }
 
-static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client)
-{
-  // TODO: implement later
-  return 0;
-}
-
 static void server_call(const rc_api_request_t* request, rc_client_server_callback_t callback, void* callback_data, rc_client_t* client) {
   int status_code;
   const char* response = send_http_request(request->url, request->post_data, &status_code);
@@ -136,9 +131,39 @@ static void server_call(const rc_api_request_t* request, rc_client_server_callba
   }
 }
 
+/* -------------- LOGIC PROCESSING AND MEMORY --------------*/
+
+static void event_handler(const rc_client_event_t* event, rc_client_t* client)
+{
+  printf("RA: Event! (%d)\n", event->type);
+  fflush(stdout);
+}
+
+static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client)
+{
+    printf("RA: Trying to read %u bytes at 0x%08X\n", num_bytes, address);
+    fflush(stdout);
+    for (uint32_t i = 0; i < num_bytes; ++i)
+    {
+        buffer[i] = NDS::ARM9Read8(address + i);
+    }
+
+    return num_bytes;
+}
+
+void rc_client_process_ra() {
+  rc_client_do_frame(g_client);
+  printf("RA: Frame processed\n");
+  fflush(stdout);
+}
+
 void initialize_retroachievements_client(void)
 {
   g_client = rc_client_create(read_memory, server_call);
+
+  // rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_VERBOSE, log_message);
+
+  rc_client_set_event_handler(g_client, event_handler);
 
   rc_client_set_hardcore_enabled(g_client, 0);
 }
@@ -219,11 +244,13 @@ static void show_game_placard(void)
   {
     int width, height;
     int textureId = DownloadAndPackAvatar(url, &width, &height);
-    printf("DEBUG: values: %d  %d %d \n", width, height, textureId);
+    printf("DEBUG: values: %d %d %d \n", width, height, textureId);
     fflush(stdout);
     
     if (textureId >= 0) {
-      g_notification.ShowWithIcon(textureId, width, height, "%s\n%s", game->title);
+      printf("DEBUG: values: %s\n", game->title);
+      fflush(stdout);
+      g_notification.ShowWithIcon(textureId, width, height, "%s\n", game->title);
     } else {
       g_notification.Show("%s\n%s", game->title);
     }

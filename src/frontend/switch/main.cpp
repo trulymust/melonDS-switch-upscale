@@ -379,6 +379,8 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
         PlatformKeysHeld |= keysDown;
         PlatformKeysHeld &= ~keysUp;
 
+        rc_client_process_ra();
+
         if ((PlatformKeysHeld & (HidNpadButton_ZL|HidNpadButton_ZR)) == (HidNpadButton_ZL|HidNpadButton_ZR))
         {
             SetPause(true);
