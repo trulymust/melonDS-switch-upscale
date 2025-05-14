@@ -18,13 +18,9 @@ void Notification::Show(const char* fmt, ...) {
 }
 
 void DestroyNotification() {
-    printf("DEBUG: Destroy called\n");
-    fflush(stdout);
     if (g_notification.textureId != -1) {
         Gfx::TextureDelete(g_notification.textureId);
         g_notification.textureId = -1;
-        printf("DEBUG: Destroyed\n");
-        fflush(stdout);
     }
 }
 

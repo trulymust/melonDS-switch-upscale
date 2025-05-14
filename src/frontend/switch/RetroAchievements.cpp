@@ -176,28 +176,24 @@ static void event_handler(const rc_client_event_t* event, rc_client_t* client)
 }
 
 
-static uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client)
+uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_client_t* client)
 {
-    printf("RA: Trying to read %u bytes at 0x%08X\n", num_bytes, address);
-    fflush(stdout);
-
-    // "low" 0x00100000 – 0x01FFFFFF
-    if ((address >= 0x00100000) && (address < 0x02000000)) {
-        for (uint32_t i = 0; i < num_bytes; ++i)
-        {
-            uint32_t addr = address + i;
-            uint32_t offset = addr & NDS::MainRAMMask;
-            buffer[i] = NDS::MainRAM[offset];
-        }
-        return num_bytes;
-    }
-
-    for (uint32_t i = 0; i < num_bytes; ++i)
-    {
-        buffer[i] = NDS::ARM9Read8(address + i);
-    }
-
-    return num_bytes;
+  for (uint32_t i = 0; i < num_bytes; ++i) {
+    uint32_t addr = address + i;
+    if (addr >= 0x00000000 && addr < 0x00400000) {
+      // Main RAM (0x02000000 - 0x02400000 nel tuo emulatore)
+      buffer[i] = NDS::MainRAM[addr];
+    } else if (addr >= 0x03000000 && addr < 0x03008000) {
+      // Shared WRAM (0x03000000 - 0x03008000)
+      buffer[i] = NDS::SharedWRAM[addr - 0x03000000];
+    } else if (addr >= 0x03800000 && addr < 0x03810000) {
+      // ARM7 WRAM (0x03800000 - 0x03810000)
+      buffer[i] = NDS::ARM7WRAM[addr - 0x03800000];
+    } else {
+      buffer[i] = 0;
+      }
+  }
+  return num_bytes;
 }
 
 
