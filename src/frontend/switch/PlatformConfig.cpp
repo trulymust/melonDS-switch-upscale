@@ -8,6 +8,7 @@ int GlobalRotation;
 int TouchscreenMode;
 int TouchscreenClickMode;
 int LeftHandedMode;
+int FastForward;
 
 int ScreenRotation;
 int ScreenGap;
@@ -44,6 +45,7 @@ ConfigEntry PlatformConfigFile[] =
     {"TouchscreenMode",         0, &TouchscreenMode,        0, NULL, 0},
     {"TouchscreenClickMode",    0, &TouchscreenClickMode,   0, NULL, 0},
     {"LeftHandedMode",          0, &LeftHandedMode,         0, NULL, 0},
+    {"FastForward",             0, &FastForward,            0, NULL, 0},
 
     {"SavStaRelocSRAM",         0, &SavestateRelocSRAM,     0, NULL, 0},
 

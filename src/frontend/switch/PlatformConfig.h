@@ -11,6 +11,7 @@ extern int GlobalRotation;
 extern int TouchscreenMode;
 extern int TouchscreenClickMode;
 extern int LeftHandedMode;
+extern int FastForward;
 
 extern int ScreenRotation;
 extern int ScreenGap;

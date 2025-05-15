@@ -421,6 +421,12 @@ void DoGui(BoxGui::Frame& parent)
             DoCheckbox(settingsFrame, settingsSkewer, "Left handed mode", leftHanded);
             Config::LeftHandedMode = leftHanded;
         }
+        {
+            SectionHeader(settingsFrame, settingsSkewer, "Joycon");
+            bool fastforward = Config::FastForward;
+            DoCheckbox(settingsFrame, settingsSkewer, "Hold to fastforward (ZL)", fastforward);
+            Config::FastForward = fastforward;
+        }
         break;
     }
     Gfx::PopScissor();

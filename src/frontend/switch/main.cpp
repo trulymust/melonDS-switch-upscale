@@ -685,11 +685,23 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
             if (LidClosed != NDS::IsLidClosed())
                 NDS::SetLidClosed(LidClosed);
 
-            bool fastForward = Config::TouchscreenMode < 2
-                && (PlatformKeysHeld & (Config::LeftHandedMode ? HidNpadButton_ZR : HidNpadButton_ZL));
+            bool fastForward = false;
+            static bool fastForwardToggle = false;
+
+            if (Config::FastForward) {
+                // "Hold"
+                fastForward = Config::TouchscreenMode < 2
+                    && (PlatformKeysHeld & (Config::LeftHandedMode ? HidNpadButton_ZR : HidNpadButton_ZL));
+            } else {
+                // "Toggle"
+                if (Config::TouchscreenMode < 2 && (PlatformKeysHeld & (Config::LeftHandedMode ? HidNpadButton_ZR : HidNpadButton_ZL))) {
+                    fastForwardToggle = !fastForwardToggle;
+                }
+                fastForward = fastForwardToggle;
+            }
+
             u64 totalFrameLength = 0;
-            do
-            {
+            do {
                 u64 frameStart = armGetSystemTick();
                 NDS::RunFrame();
                 u64 frameLength = armTicksToNs(armGetSystemTick() - frameStart);
@@ -700,7 +712,7 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
 
                 totalFrameLength += frameLength;
                 //svcSleepThread(1000*1000*500);
-            } while ((!Config::LimitFramerate || fastForward) && totalFrameLength < 1000000000/60);
+            } while ((!Config::LimitFramerate || fastForward) && totalFrameLength < 1000000000 / 60);
         }
     }
 

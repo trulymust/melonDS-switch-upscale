@@ -181,7 +181,7 @@ uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_c
   for (uint32_t i = 0; i < num_bytes; ++i) {
     uint32_t addr = address + i;
     if (addr >= 0x00000000 && addr < 0x00400000) {
-      // Main RAM (0x02000000 - 0x02400000 nel tuo emulatore)
+      // Main RAM (0x02000000 - 0x02400000)
       buffer[i] = NDS::MainRAM[addr];
     } else if (addr >= 0x03000000 && addr < 0x03008000) {
       // Shared WRAM (0x03000000 - 0x03008000)
@@ -225,11 +225,7 @@ void shutdown_retroachievements_client(void)
 static void login_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {
   if (result != RC_OK)
-  {
-    printf("DEBUG: login failed. Status: %d\n%s\n", result, error_message);
-    fflush(stdout);
     return;
-  }
 
   const rc_client_user_t* user = rc_client_get_user_info(client);
   int avatarTexture = -1;
@@ -288,12 +284,8 @@ static void show_game_placard(void)
   {
     int width, height;
     int textureId = DownloadAndPackAvatar(url, &width, &height);
-    printf("DEBUG: values: %d %d %d \n", width, height, textureId);
-    fflush(stdout);
     
     if (textureId >= 0) {
-      printf("DEBUG: values: %s\n", game->title);
-      fflush(stdout);
       g_notification.ShowWithIcon(textureId, width, height, "%s\n", game->title);
     } else {
       g_notification.Show("%s\n%s", game->title);
@@ -307,8 +299,6 @@ static void show_game_placard(void)
 
 static void load_game_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {
-  printf("RetroAchievements game loaded, result: %d\n", result);
-  fflush(stdout);
   if (result != RC_OK)
   {
     printf("RetroAchievements game load failed: %s\nResult: %d", error_message, result);
@@ -322,8 +312,6 @@ static void load_game_callback(int result, const char* error_message, rc_client_
 
 void load_game_from_file(const char* path)
 {
-  printf("RetroAchievements game loading: %s\n", path);
-  fflush(stdout);
   rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_NINTENDO_DS, 
       path, NULL, 0, load_game_callback, NULL);
 }

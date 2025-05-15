@@ -218,7 +218,7 @@ void Write(u8 val, u32 hold)
         }
         else
         {
-            printf("DSi_SPI_TSC: unknown IO, bank=%02X, index=%02X (%02X %s)\n", Bank, Index, Index>>1, (Index&1)?"read":"write");
+            // printf("DSi_SPI_TSC: unknown IO, bank=%02X, index=%02X (%02X %s)\n", Bank, Index, Index>>1, (Index&1)?"read":"write");
         }
 
         Index += (1<<1); // increment index
