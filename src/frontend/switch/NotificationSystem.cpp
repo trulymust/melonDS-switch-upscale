@@ -50,37 +50,40 @@ void Notification::Render() {
         return;
     }
 
-    Gfx::Vector2f position = {1280.f - 400.f, 40.f};
-    Gfx::Vector2f size = {380.f, 50.f};
+    // Usa MeasureText per calcolare la larghezza e l'altezza del testo
+    Gfx::Vector2f textSize = Gfx::MeasureText(Gfx::SystemFontStandard, TextLineHeight, message.c_str());
+    float padding = 20.f; // Padding per i bordi
+    float avatarSize = (textureId >= 0 && nwidth > 0 && nheight > 0) ? 40.f : 0.f; // Dimensione dell'icona (quadrata)
+    float spacing = (avatarSize > 0) ? 10.f : 0.f; // Spazio tra l'icona e il testo
+    float rectWidth = textSize.X + padding * 2 + avatarSize + spacing; // Larghezza rettangolo
+    float rectHeight = std::max(textSize.Y + padding * 2, avatarSize + padding * 2); // Altezza rettangolo
+
+    Gfx::Vector2f position = {1280.f - rectWidth - 20.f, 40.f}; // Posizionamento in alto a destra
+    Gfx::Vector2f size = {rectWidth, rectHeight};
 
     Gfx::DrawRectangle(position, size, WidgetColorBright, true);
 
-    Gfx::Vector2f textOffset = position + Gfx::Vector2f{10.f, 25.f};
+    Gfx::Vector2f textOffset = position + Gfx::Vector2f{
+        padding + avatarSize + spacing, // Offset orizzontale accanto all'icona
+        (rectHeight - textSize.Y) / 2.f // Centrare verticalmente il testo
+    };
 
     if (textureId >= 0) {
         if (nwidth > 0 && nheight > 0) {
-            Gfx::Vector2f avatarPos = position + Gfx::Vector2f{5.f, 5.f};
-            Gfx::Vector2f maxSize = {40.f, 40.f};
-
-            float scale = std::min(maxSize.X / nwidth, maxSize.Y / nheight);
-            Gfx::Vector2f avatarSize = {nwidth * scale, nheight * scale};
+            Gfx::Vector2f avatarPos = position + Gfx::Vector2f{padding, (rectHeight - avatarSize) / 2.f};
+            Gfx::Vector2f avatarDrawSize = {avatarSize, avatarSize};
 
             Gfx::DrawRectangle(
                 textureId,
                 avatarPos,
-                avatarSize,
+                avatarDrawSize,
                 {0.f, 0.f}, {static_cast<float>(nwidth), static_cast<float>(nheight)},
                 WidgetColorBright
             );
-
-            textOffset.X += avatarSize.X + 10.f;
         } else {
             printf("DEBUG: Invalid avatar dimensions: nwidth=%d, nheight=%d\n", nwidth, nheight);
             fflush(stdout);
         }
-    } else {
-        printf("DEBUG: Notification System: icon is null\n");
-        fflush(stdout);
     }
 
     if (!message.empty()) {
