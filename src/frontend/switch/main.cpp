@@ -1048,6 +1048,7 @@ int main(int argc, const char* argv[])
             break;
         case uiScreen_EmulationSettings:
         case uiScreen_DisplaySettings:
+        case uiScreen_RetroAchievements:
         case uiScreen_InputSettings:
             SettingsDialog::DoGui(rootFrame);
             break;

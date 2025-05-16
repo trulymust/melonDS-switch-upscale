@@ -410,6 +410,14 @@ void DoGui(BoxGui::Frame& parent)
         }
         Emulation::UpdateScreenLayout();
         break;
+    case uiScreen_RetroAchievements:
+        title = "RetroAchievements List";
+        {
+            SectionHeader(settingsFrame, settingsSkewer, "List");
+            bool integerScaling = Config::IntegerScaling;
+            DoCheckbox(settingsFrame, settingsSkewer, "Integer scaling", integerScaling);
+        }
+        break;
     case uiScreen_InputSettings:
         title = "Input settings";
         {
