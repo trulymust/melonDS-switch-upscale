@@ -7,7 +7,7 @@
 #include "ErrorDialog.h"
 
 #include "PlatformConfig.h"
-
+#include "RetroAchievements.h"
 #include "../FrontendUtil.h"
 
 #include "stb_image/stb_image.h"
@@ -151,6 +151,11 @@ void DoGui(BoxGui::Frame& parent)
                 Emulation::Reset();
             }
             sideBarSkewer.Advance(spacing);
+            if (isConnected() && SideBarEntry(sideBarFrame, sideBarSkewer, "RetroAchievements List")) {
+
+                CurrentUiScreen = uiScreen_RetroAchievements;
+                
+            }
             if (SideBarEntry(sideBarFrame, sideBarSkewer, "Display settings"))
             {
                 CurrentUiScreen = uiScreen_DisplaySettings;

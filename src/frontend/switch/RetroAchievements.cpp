@@ -384,3 +384,10 @@ int InitRetroAchievements(const char* username, const char* password) {
   return g_login_successful ? 200 : 401;
 
 }
+
+bool isConnected() {
+  if(g_client) {
+    return true;
+  }
+  return false;
+}

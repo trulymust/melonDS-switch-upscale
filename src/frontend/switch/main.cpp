@@ -777,7 +777,6 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
 
     if (State == emuState_Paused)
     {
-        // blend down
         Gfx::DrawRectangle({0.f, 0.f}, {1280.f, 1280.f}, DarkColorTransparent);
     }
 }
@@ -827,8 +826,6 @@ std::string GetLoadErrorStr(int error)
 
 void LoadROM(const char* file)
 {
-    printf("Loading ROM...\n");
-    fflush(stdout);
     Overclocking::ApplyOverclock(Config::SwitchOverclock);
 
     assert(State == emuState_Nothing);
