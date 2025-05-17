@@ -153,8 +153,6 @@ void DoGui(BoxGui::Frame& parent)
             sideBarSkewer.Advance(spacing);
             if (isConnected() && SideBarEntry(sideBarFrame, sideBarSkewer, "RetroAchievements List")) 
             {
-                printf("RetroAchievements List\n");
-                fflush(stdout);
                 CurrentUiScreen = uiScreen_RetroAchievements;   
             }
             if (SideBarEntry(sideBarFrame, sideBarSkewer, "Display settings"))

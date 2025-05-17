@@ -315,6 +315,68 @@ void DoTextField(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* labe
     }
 }
 
+void DoLabel(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* text, bool first = false)
+{
+    BoxGui::Frame settingFrame{
+        parent,
+        skewer.Spit({parent.Area.Size.X, UIRowHeight}, Gfx::align_Right),
+        {5.f, 5.f},
+        {5.f, 5.f}
+    };
+
+    bool selected = BoxGui::InputElement(settingFrame, BoxGui::MakeUniqueName(SettingsPrefix, BoxGui::MakeUniqueName(text, 0)));
+
+    Gfx::DrawRectangle(settingFrame.Area.Position - Gfx::Vector2f{0.f, 5.f},
+                       settingFrame.Area.Size + Gfx::Vector2f{0.f, 5.f * 2.f},
+                       WidgetColorBright, true);
+
+    if (selected)
+        Gfx::DrawRectangle(settingFrame.Area.Position, settingFrame.Area.Size, WidgetColorVibrant);
+               
+
+    BoxGui::Skewer settingSkewer{settingFrame, settingFrame.Area.Size.Y / 2.f, BoxGui::direction_Horizontal};
+
+    settingSkewer.AlignLeft(20.f);
+    Gfx::DrawText(Gfx::SystemFontStandard,
+                  settingSkewer.CurrentPosition(),
+                  TextLineHeight,
+                  DarkColor,
+                  Gfx::align_Left,
+                  Gfx::align_Center,
+                  text);
+
+    if (!first)
+    {
+        Gfx::DrawRectangle(settingFrame.Area.Position + Gfx::Vector2f{10.f, -(5.f + 1.f)},
+                           {settingFrame.Area.Size.X - 2 * 10.f, 2.f},
+                           SeparatorColor);
+    }
+}
+
+void ShowImage(BoxGui::Frame& parent, BoxGui::Skewer& skewer, int textureId, int nwidth, int nheight, float imageSize = 64.f)
+{
+    if (textureId < 0 || nwidth <= 0 || nheight <= 0)
+        return;
+
+    BoxGui::Frame settingFrame{
+        parent,
+        skewer.Spit({parent.Area.Size.X, imageSize + 10.f}, Gfx::align_Right),
+        {5.f, 5.f},
+        {5.f, 5.f}
+    };
+
+    BoxGui::Skewer settingSkewer{settingFrame, settingFrame.Area.Size.Y / 2.f, BoxGui::direction_Horizontal};
+    settingSkewer.AlignLeft(20.f);
+
+    Gfx::Vector2f avatarPos = settingSkewer.CurrentPosition();
+    Gfx::Vector2f avatarDrawSize = {imageSize, imageSize};
+
+    Gfx::DrawRectangle(textureId, avatarPos, avatarDrawSize,
+                       {0.f, 0.f},
+                       {static_cast<float>(nwidth), static_cast<float>(nheight)},
+                       WidgetColorBright);
+}
+
 void DoGui(BoxGui::Frame& parent)
 {
     BoxGui::Frame settingsFrame{parent,
@@ -412,10 +474,20 @@ void DoGui(BoxGui::Frame& parent)
         break;
     case uiScreen_RetroAchievements:
         title = "RetroAchievements List";
-        {
-            SectionHeader(settingsFrame, settingsSkewer, "List");
-            bool integerScaling = Config::IntegerScaling;
-            DoCheckbox(settingsFrame, settingsSkewer, "Integer scaling", integerScaling);
+        {    
+            if (g_achievements.empty()) {
+                DoLabel(settingsFrame, settingsSkewer, "This title does not have any achievements.");
+                DoLabel(settingsFrame, settingsSkewer, "Please check the RetroAchievements website for more information.");
+            } else {
+                for (const auto& ach : g_achievements) {
+                    SectionHeader(settingsFrame, settingsSkewer, ach.title.c_str());
+                    DoLabel(settingsFrame, settingsSkewer, ach.description.c_str());
+                    DoLabel(settingsFrame, settingsSkewer, ach.progress.c_str());
+                    if (ach.textureId >= 0)
+                        ShowImage(settingsFrame, settingsSkewer, ach.textureId, ach.width, ach.height);
+                }
+                
+            }
         }
         break;
     case uiScreen_InputSettings:

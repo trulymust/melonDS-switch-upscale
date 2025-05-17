@@ -1,3 +1,4 @@
+#include "RetroAchievements.h"
 #include <fstream>
 #include <string>
 #include <switch.h>
@@ -5,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstring>
+#include <thread>
+#include <atomic>
 #include <cstdlib>
 #include "stb_image/stb_image.h"
 #include "ROMMetaDatabase.h"
@@ -19,11 +22,12 @@ extern "C" {
     #include <rc_client.h>
     #include <rc_consoles.h>
 }
-
-    
+  
 static std::string g_response;
 rc_client_t* g_client = NULL;
 static bool g_login_successful = false;
+std::atomic<bool> g_loadingAchievements = false;
+std::vector<Achievement> g_achievements;
 
 
 /* -------------- SERVER COMUNICATION --------------*/
@@ -40,7 +44,6 @@ static size_t switch_curl_write_image_callback(void* contents, size_t size, size
   image_data->insert(image_data->end(), (unsigned char*)contents, (unsigned char*)contents + realsize);
   return realsize;
 }
-
 
 // This for download icons from rcheevos APIs
 int DownloadAndPackAvatar(const char* url,  int* outWidth, int* outHeight) {
@@ -131,59 +134,53 @@ static void server_call(const rc_api_request_t* request, rc_client_server_callba
   }
 }
 
-/*
-void show_achievements_menu(void)
-{
+std::vector<Achievement> achievements_list() {
+  printf("RA: Fetching achievements list...\n");
+  fflush(stdout);
+  std::vector<Achievement> achievements;
   char url[128];
-  const char* progress;
 
-  // This will return a list of lists. Each top-level item is an achievement category
-  // (Active Challenge, Unlocked, etc). Empty categories are not returned, so we can
-  // just display everything that is returned.
-  rc_client_achievement_list_t* list = rc_client_create_achievement_list(g_client,
+  rc_client_achievement_list_t* list = rc_client_create_achievement_list(
+      g_client,
       RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE_AND_UNOFFICIAL,
-      RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_PROGRESS);
+      RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_PROGRESS
+  );
 
-  // Clear any previously loaded menu items
-  menu_reset();
+  if (!list) {
+      return achievements;
+  }
 
-  for (int i = 0; i < list->num_buckets; i++)
-  {
-    // Create a header item for the achievement category
-    menu_append_item(NULL, list->buckets[i].label, "");
+  for (int i = 0; i < list->num_buckets; i++) {
+      for (int j = 0; j < list->buckets[i].num_achievements; j++) {
+          const rc_client_achievement_t* achievement = list->buckets[i].achievements[j];
+          Achievement ach;
 
-    for (int j = 0; j < list->buckets[i].num_achievements; j++)
-    {
-      const rc_client_achievement_t* achievement = list->buckets[i].achievements[j];
-      async_image_data* image_data = NULL;
+          ach.title = achievement->title ? achievement->title : "Unknown Title";
+          ach.description = achievement->description ? achievement->description : "No Description";
 
-      if (rc_client_achievement_get_image_url(achievement, achievement->state, url, sizeof(url)) == RC_OK)
-      {
-         // Generate a local filename to store the downloaded image.
-         char achievement_badge[64];
-         snprintf("ach_%s%s.png", achievement->badge_name, 
-                  (state == RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED) ? "" : "_lock");
-         image_data = download_and_cache_image(achievement_badge, url);
-      } 
+          if (list->buckets[i].bucket_type == RC_CLIENT_ACHIEVEMENT_BUCKET_UNSUPPORTED) {
+              ach.progress = "Unsupported";
+          } else if (achievement->unlocked) {
+              ach.progress = "Unlocked";
+          } else if (achievement->measured_percent) {
+              ach.progress = achievement->measured_progress;
+          } else {
+              ach.progress = "Locked";
+          }
 
-      // Determine the "progress" of the achievement. This can also be used to show
-      // locked/unlocked icons and progress bars.
-      if (list->buckets[i].id == RC_CLIENT_ACHIEVEMENT_BUCKET_UNSUPPORTED)
-        progress = "Unsupported";
-      else if (achievement->unlocked)
-        progress = "Unlocked";
-      else if (achievement->measured_percent)
-        progress = achievement->measured_progress;
-      else
-        progress = "Locked";
+          if (rc_client_achievement_get_image_url(achievement, achievement->state, url, sizeof(url)) == RC_OK) {
+            ach.textureId = DownloadAndPackAvatar(url, &ach.width, &ach.height);
+          } else {
+              ach.textureId = -1;
+          }
 
-      menu_append_item(image_data, achievement->title, achievement->description, progress);
-    }
+          achievements.push_back(ach);
+      }
   }
 
   rc_client_destroy_achievement_list(list);
+  return achievements;
 }
-*/
 
 /* -------------- LOGIC PROCESSING AND MEMORY --------------*/
 static void achievement_triggered(const rc_client_achievement_t* achievement)
@@ -363,14 +360,15 @@ static void load_game_callback(int result, const char* error_message, rc_client_
     return;
   }
 
-  // announce that the game is ready. we'll cover this in the next section.
   show_game_placard();
+
+  g_achievements = achievements_list();
+
 }
 
 void load_game_from_file(const char* path)
 {
-  rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_NINTENDO_DS, 
-      path, NULL, 0, load_game_callback, NULL);
+  rc_client_begin_identify_and_load_game(g_client, RC_CONSOLE_NINTENDO_DS, path, NULL, 0, load_game_callback, NULL);
 }
 
 
