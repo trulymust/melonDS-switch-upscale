@@ -27,6 +27,7 @@ rc_client_t* g_client = NULL;
 static bool g_login_successful = false;
 bool g_loadAchievements = true;
 std::vector<Achievement> g_achievements;
+const char* client = "melonDS/11.6 (Switch NX)";
 
 /* -------------- SERVER COMUNICATION --------------*/
 
@@ -56,6 +57,7 @@ int DownloadAndPackAvatar(const char* url,  int* outWidth, int* outHeight) {
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &image_data);
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); 
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, client);
 
   CURLcode res = curl_easy_perform(curl);
   curl_easy_cleanup(curl);
@@ -92,7 +94,8 @@ const char* send_http_request(const char* url, const char* post_data, int* statu
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, switch_curl_write_callback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, nullptr);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); 
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L); 
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, client);
 
     CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
