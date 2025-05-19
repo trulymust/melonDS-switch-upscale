@@ -428,13 +428,19 @@ void DoGui(BoxGui::Frame& parent)
         {
             bool loginRA = false;
             int status = 0;
-            SectionHeader(settingsFrame, settingsSkewer, "RetroAchievements");
-            DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Username", Config::RetroAchievementsUsername, sizeof(Config::RetroAchievementsUsername));
-            DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Password", Config::RetroAchievementsPassword, sizeof(Config::RetroAchievementsPassword));
-            DoCheckbox(settingsFrame, settingsSkewer, "Login", loginRA);
-            if (loginRA) {
-                status = InitRetroAchievements(Config::RetroAchievementsUsername, Config::RetroAchievementsPassword);
+            static char username[64] = {0}, password[64] = {0};
+
+            if (strlen(Config::RetroAchievementsUsername) > 0) {
+                strncpy(username, Config::RetroAchievementsUsername, sizeof(username) - 1);
+                username[sizeof(username) - 1] = '\0';
             }
+
+            SectionHeader(settingsFrame, settingsSkewer, "RetroAchievements");
+            DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Username", username, sizeof(username));
+            DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Password", password, sizeof(password));
+            DoCheckbox(settingsFrame, settingsSkewer, "Login", loginRA);
+            if (loginRA)
+                InitRetroAchievements(username, password, false);
         }
         break;
     case uiScreen_DisplaySettings:

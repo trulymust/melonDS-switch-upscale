@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cstdlib>
 #include "stb_image/stb_image.h"
+#include "PlatformConfig.h"
 #include "ROMMetaDatabase.h"
 #include "NotificationSystem.h"
 #include "NDS.h"
@@ -114,6 +115,14 @@ const char* send_http_request(const char* url, const char* post_data, int* statu
     return response_cstr;
 }
 
+void store_retroachievements_credentials(const char* username, const char* token) {
+  strncpy(Config::RetroAchievementsUsername, username, sizeof(Config::RetroAchievementsUsername) - 1);
+  Config::RetroAchievementsUsername[sizeof(Config::RetroAchievementsUsername) - 1] = '\0';
+
+  strncpy(Config::RetroAchievementsToken, token, sizeof(Config::RetroAchievementsToken) - 1);
+  Config::RetroAchievementsToken[sizeof(Config::RetroAchievementsToken) - 1] = '\0';
+}
+
 static void server_call(const rc_api_request_t* request, rc_client_server_callback_t callback, void* callback_data, rc_client_t* client) {
   int status_code;
   const char* response = send_http_request(request->url, request->post_data, &status_code);
@@ -206,7 +215,6 @@ static void achievement_triggered(const rc_client_achievement_t* achievement)
   // TODO LATER play_sound("unlock.wav");
 }
 
-
 static void event_handler(const rc_client_event_t* event, rc_client_t* client)
 {
     switch (event->type)
@@ -254,8 +262,6 @@ void initialize_retroachievements_client(void)
 {
   g_client = rc_client_create(read_memory, server_call);
 
-  // rc_client_enable_logging(g_client, RC_CLIENT_LOG_LEVEL_VERBOSE, log_message);
-
   rc_client_set_event_handler(g_client, event_handler);
 
   rc_client_set_hardcore_enabled(g_client, 0);
@@ -273,6 +279,15 @@ void shutdown_retroachievements_client(void)
 
 static void login_callback(int result, const char* error_message, rc_client_t* client, void* userdata)
 {
+  // No Response, retry
+  if (result == -32) {
+    if (Config::RetroAchievementsUsername[0] != '\0' || Config::RetroAchievementsUsername[0] != '/') {
+      g_notification.Show("Login failed: no response. Retrying..");
+      rc_client_begin_login_with_token(g_client, Config::RetroAchievementsUsername, Config::RetroAchievementsToken, login_callback, NULL);
+      return;
+    }
+    return;
+  }
   if (result != RC_OK) {
     g_notification.Show("Login failed: %s", error_message);
     g_login_successful = false;
@@ -283,21 +298,15 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
   int avatarTexture = -1;
   int texWidth = 0, texHeight = 0;
 
+  store_retroachievements_credentials(user->username, user->token);
+
   if (user->avatar_url) {
     avatarTexture = DownloadAndPackAvatar(user->avatar_url,  &texWidth, &texHeight);
 
     g_notification.ShowWithIcon(avatarTexture, texWidth, texHeight, "Welcome %s (%u points)", user->display_name, user->score);
     return;
   }
-  // TODO store_retroachievements_credentials(user->username, user->token);
   g_notification.Show("Welcome %s (%u points)", user->display_name, user->score);
-}
-
-void login_retroachievements_user(const char* username, const char* password)
-{
-  // This will generate an HTTP payload and call the server_call chain above.
-  // Eventually, login_callback will be called to let us know if the login was successful.
-  rc_client_begin_login_with_password(g_client, username, password, login_callback, NULL);
 }
 
 /* -------------- STARTING GAME SESSION --------------*/
@@ -361,12 +370,11 @@ void load_game_from_file(const char* path)
 
 /* -------------- INITIALIZATION --------------*/
 
-int InitRetroAchievements(const char* username, const char* password) {
+void InitRetroAchievements(const char* username, const char* password, bool isToken) {
   initialize_retroachievements_client();
 
-  login_retroachievements_user(username, password);
-
-  return g_login_successful ? 200 : 401;
+  if(isToken) rc_client_begin_login_with_token(g_client, username, password, login_callback, NULL);
+  else rc_client_begin_login_with_password(g_client, username, password, login_callback, NULL);
 
 }
 

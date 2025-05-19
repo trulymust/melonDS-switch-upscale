@@ -1011,6 +1011,9 @@ int main(int argc, const char* argv[])
 
     bool argvLoaded = false;
 
+    if (Config::RetroAchievementsUsername[0] != '\0')
+        InitRetroAchievements(Config::RetroAchievementsUsername, Config::RetroAchievementsToken, true);
+    
     while (appletMainLoop() && !Done)
     {
         Gfx::StartFrame();

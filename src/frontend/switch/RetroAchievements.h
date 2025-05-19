@@ -15,7 +15,7 @@ extern std::vector<Achievement> g_achievements;
 
 extern bool g_loadAchievements;
 
-int InitRetroAchievements(const char* username, const char* password);
+void InitRetroAchievements(const char* username, const char* password, bool isToken);
 
 void load_game_from_file(const char* path);
 
