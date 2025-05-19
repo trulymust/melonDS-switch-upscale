@@ -192,6 +192,26 @@ std::vector<Achievement> achievements_list() {
   return achievements;
 }
 
+/* -------------- LEADERBOARD --------------*/
+
+static void leaderboard_started(const rc_client_leaderboard_t* leaderboard)
+{
+  printf("Leaderboard attempt started: %s - %s", leaderboard->title, leaderboard->description);
+  fflush(stdout);
+}
+
+static void leaderboard_failed(const rc_client_leaderboard_t* leaderboard)
+{
+  printf("Leaderboard attempt failed: %s", leaderboard->title);
+  fflush(stdout);
+}
+
+static void leaderboard_submitted(const rc_client_leaderboard_t* leaderboard)
+{
+  printf("Submitted %s for %s", leaderboard->tracker_value, leaderboard->title);
+  fflush(stdout);
+}
+
 /* -------------- LOGIC PROCESSING AND MEMORY --------------*/
 static void achievement_triggered(const rc_client_achievement_t* achievement)
 {
@@ -220,19 +240,25 @@ static void achievement_triggered(const rc_client_achievement_t* achievement)
 
 static void event_handler(const rc_client_event_t* event, rc_client_t* client)
 {
-    switch (event->type)
-    {
-        case RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED:
-            printf("RA: Achievement triggered: %s\n", event->achievement->title);
-            achievement_triggered(event->achievement);
-            break;
-
-        default:
-            printf("RA: Unhandled event (%d)\n", event->type);
-            break;
-    }
-
-    fflush(stdout);
+  switch (event->type){
+    case RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED:
+      printf("RA: Achievement triggered: %s\n", event->achievement->title);
+      achievement_triggered(event->achievement);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_STARTED:
+      leaderboard_started(event->leaderboard);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_FAILED:
+      leaderboard_failed(event->leaderboard);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_SUBMITTED:
+      leaderboard_submitted(event->leaderboard);
+      break;
+    default:
+      printf("RA: Unhandled event (%d)\n", event->type);
+      break;
+  }
+  fflush(stdout);
 }
 
 
