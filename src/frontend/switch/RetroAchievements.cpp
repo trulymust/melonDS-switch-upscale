@@ -215,26 +215,83 @@ static void leaderboard_submitted(const rc_client_leaderboard_t* leaderboard)
 
 static void leaderboard_tracker_update(const rc_client_leaderboard_tracker_t* tracker)
 {
-    std::string trackerId = std::to_string(tracker->id);
+  printf("Tracker %d updated: %s", tracker->id, tracker->display);
+  fflush(stdout);
+  std::string trackerId = std::to_string(tracker->id);
 
-    LeaderboardTracker* data = find_tracker(trackerId);
-    if (data) {
-        data->Update(tracker->display);
-    }
+  LeaderboardTracker* data = find_tracker(trackerId);
+  if (data) {
+    data->Update(tracker->display);
+  }
 }
 
 static void leaderboard_tracker_show(const rc_client_leaderboard_tracker_t* tracker)
 {
-    std::string trackerId = std::to_string(tracker->id);
+  printf("Tracker %d show: %s", tracker->id, tracker->display);
+  fflush(stdout);
+  std::string trackerId = std::to_string(tracker->id);
 
-    create_tracker(trackerId, tracker->display);
+  create_tracker(trackerId, tracker->display);
 }
 
 static void leaderboard_tracker_hide(const rc_client_leaderboard_tracker_t* tracker)
 {
-    std::string trackerId = std::to_string(tracker->id);
+  std::string trackerId = std::to_string(tracker->id);
 
-    destroy_tracker(trackerId);
+  destroy_tracker(trackerId);
+}
+
+// Multiple challenge indicators may be shown, but only one per achievement, so key the list on the achievement ID
+static void challenge_indicator_show(const rc_client_achievement_t* achievement)
+{
+  char url[128];
+  int width, height;
+
+  if (rc_client_achievement_get_image_url(achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED, url, sizeof(url)) == RC_OK)
+  {
+    int textureId = DownloadAndPackAvatar(url, &width, &height);
+    if (textureId >= 0) {
+      g_notification.ShowWithIcon(textureId, width, height, "%d", achievement->id, achievement->title);
+    } else {
+      g_notification.Show("%d", achievement->id);
+    }
+  }
+}
+
+static void challenge_indicator_hide(const rc_client_achievement_t* achievement)
+{
+  // This indicator is no longer needed
+  // TODO: destroy_challenge_indicator(achievement->id);
+}
+
+// The UPDATE event assumes the indicator is already visible, and just asks us to update the image/text.
+static void progress_indicator_update(const rc_client_achievement_t* achievement)
+{
+  char url[128];
+  int width, height;
+
+  if (rc_client_achievement_get_image_url(achievement, RC_CLIENT_ACHIEVEMENT_STATE_ACTIVE, url, sizeof(url)) == RC_OK)
+  {
+    int textureId = DownloadAndPackAvatar(url, &width, &height);
+    if (textureId >= 0) {
+      g_notification.ShowWithIcon(textureId, width, height, "%s", achievement->measured_progress);
+    } else {
+      g_notification.Show("%s", achievement->measured_progress);
+    }
+  }
+}
+
+static void progress_indicator_show(const rc_client_achievement_t* achievement)
+{
+  // The SHOW event tells us the indicator was not visible, but should be now.
+  // To reduce duplicate code, we just update the non-visible indicator, then show it.
+  progress_indicator_update(achievement);
+}
+
+static void progress_indicator_hide(void)
+{
+  // The HIDE event indicates the indicator should no longer be visible.
+  // TODO: hide_progress_indicator();
 }
 
 /* -------------- LOGIC PROCESSING AND MEMORY --------------*/
@@ -287,6 +344,21 @@ static void event_handler(const rc_client_event_t* event, rc_client_t* client)
       break;
     case RC_CLIENT_EVENT_LEADERBOARD_TRACKER_HIDE:
       leaderboard_tracker_hide(event->leaderboard_tracker);
+      break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_CHALLENGE_INDICATOR_SHOW:
+      challenge_indicator_show(event->achievement);
+      break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_CHALLENGE_INDICATOR_HIDE:
+      challenge_indicator_hide(event->achievement);
+      break;
+      case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_SHOW:
+      progress_indicator_show(event->achievement);
+      break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_UPDATE:
+      progress_indicator_update(event->achievement);
+      break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_HIDE:
+      progress_indicator_hide();
       break;
     default:
       printf("RA: Unhandled event (%d)\n", event->type);
