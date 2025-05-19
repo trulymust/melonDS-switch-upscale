@@ -475,6 +475,9 @@ void DoGui(BoxGui::Frame& parent)
     case uiScreen_RetroAchievements:
         title = "RetroAchievements List";
         {    
+            if (g_loadAchievements) {
+                g_achievements = achievements_list();   
+            }
             if (g_achievements.empty()) {
                 DoLabel(settingsFrame, settingsSkewer, "This title does not have any achievements.");
                 DoLabel(settingsFrame, settingsSkewer, "Please check the RetroAchievements website for more information.");

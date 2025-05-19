@@ -167,6 +167,7 @@ void DoGui(BoxGui::Frame& parent)
             if (SideBarEntry(sideBarFrame, sideBarSkewer, "Close", true))
             {
                 Emulation::Stop();
+                g_loadAchievements = true;
             }
 
             KeyExplanation::Explain(KeyExplanation::button_B, "Unpause");

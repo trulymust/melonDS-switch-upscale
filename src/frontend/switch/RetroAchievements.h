@@ -1,6 +1,5 @@
 #pragma once
 #include <string>
-#include <atomic>
 #include <vector>
 
 struct Achievement {
@@ -12,8 +11,9 @@ struct Achievement {
     int height = 0;
 };
 
-extern std::atomic<bool> g_loadingAchievements;
 extern std::vector<Achievement> g_achievements;
+
+extern bool g_loadAchievements;
 
 int InitRetroAchievements(const char* username, const char* password);
 
@@ -22,3 +22,5 @@ void load_game_from_file(const char* path);
 void rc_client_process_ra();
 
 bool isConnected();
+
+std::vector<Achievement> achievements_list();

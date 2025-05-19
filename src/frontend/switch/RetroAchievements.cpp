@@ -6,8 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstring>
-#include <thread>
-#include <atomic>
 #include <cstdlib>
 #include "stb_image/stb_image.h"
 #include "ROMMetaDatabase.h"
@@ -26,9 +24,8 @@ extern "C" {
 static std::string g_response;
 rc_client_t* g_client = NULL;
 static bool g_login_successful = false;
-std::atomic<bool> g_loadingAchievements = false;
+bool g_loadAchievements = true;
 std::vector<Achievement> g_achievements;
-
 
 /* -------------- SERVER COMUNICATION --------------*/
 
@@ -135,8 +132,9 @@ static void server_call(const rc_api_request_t* request, rc_client_server_callba
 }
 
 std::vector<Achievement> achievements_list() {
-  printf("RA: Fetching achievements list...\n");
-  fflush(stdout);
+  g_loadAchievements = false;
+  g_notification.Show("Fetching achievements list...");
+
   std::vector<Achievement> achievements;
   char url[128];
 
@@ -315,20 +313,11 @@ static void show_game_placard(void)
   // Construct a message indicating the number of achievements unlocked by the user.
   if (summary.num_core_achievements == 0)
   {
-    printf("This game has no achievements.\n");
-    fflush(stdout);
+    g_notification.Show("%s\nNo achievements available for this game.", game->title);
   }
   else if (summary.num_unsupported_achievements)
   {
-    printf("You have %u of %u achievements unlocked (%d unsupported).\n",
-        summary.num_unlocked_achievements, summary.num_core_achievements,
-        summary.num_unsupported_achievements);
-    fflush(stdout);
-  }
-  else
-  {
-    printf("You have %u of %u achievements unlocked.\n", summary.num_unlocked_achievements, summary.num_core_achievements);
-    fflush(stdout);
+    g_notification.Show("%s\nYou have %u of %u achievements unlocked.\nSome achievements are not supported.", game->title, summary.num_unlocked_achievements, summary.num_core_achievements);
   }
 
   // The emulator is responsible for managing images. This uses rc_client to build
@@ -340,13 +329,13 @@ static void show_game_placard(void)
     int textureId = DownloadAndPackAvatar(url, &width, &height);
     
     if (textureId >= 0) {
-      g_notification.ShowWithIcon(textureId, width, height, "%s\n", game->title);
+      g_notification.ShowWithIcon(textureId, width, height, "%s\nYou have %u of %u achievements unlocked.\n", game->title, summary.num_unlocked_achievements, summary.num_core_achievements);
     } else {
-      g_notification.Show("%s\n%s", game->title);
+      g_notification.Show("%s\nYou have %u of %u achievements unlocked.", game->title, summary.num_unlocked_achievements, summary.num_core_achievements);
     }
   }
   else {
-    g_notification.Show("%s\n%s", game->title);
+    g_notification.Show("%s\nYou have %u of %u achievements unlocked.", game->title, summary.num_unlocked_achievements, summary.num_core_achievements);
   }
 
 }
@@ -355,15 +344,13 @@ static void load_game_callback(int result, const char* error_message, rc_client_
 {
   if (result != RC_OK)
   {
-    printf("RetroAchievements game load failed: %s\nResult: %d", error_message, result);
-    fflush(stdout);
+    g_notification.Show("RetroAchievements game load failed: %s", error_message);
     return;
   }
 
   show_game_placard();
 
-  g_achievements = achievements_list();
-
+  //g_achievements = achievements_list();
 }
 
 void load_game_from_file(const char* path)
