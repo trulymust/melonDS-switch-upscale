@@ -8,6 +8,7 @@ struct Notification {
     bool active = false;
     std::string message;
     time_t startTime = 0;
+    bool persistent = false;
     int durationSeconds = 3;
     int textureId = -1;
     int nwidth = 0;

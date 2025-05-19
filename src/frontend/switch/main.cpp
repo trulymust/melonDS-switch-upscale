@@ -35,6 +35,7 @@
 
 #include "RetroAchievements.h"
 #include "NotificationSystem.h"
+#include "RATracker.h"
 
 bool Done = false;
 int CurrentUiScreen = uiScreen_Start;
@@ -1070,6 +1071,9 @@ int main(int argc, const char* argv[])
 
         BoxGui::Update(rootFrame, keysDown, keysUp);
         g_notification.Render();
+        for (auto& [id, tracker] : g_leaderboardTrackers) {
+            tracker.Render();
+        }
 
         Gfx::PopScissor();
 

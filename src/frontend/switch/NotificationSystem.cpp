@@ -45,7 +45,7 @@ void Notification::Render() {
     if (!active)
         return;
 
-    if (difftime(time(nullptr), startTime) > durationSeconds) {
+    if (!persistent && difftime(time(nullptr), startTime) > durationSeconds) {
         active = false;
         textureId = -1;
         DestroyNotification();

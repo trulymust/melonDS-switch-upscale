@@ -12,6 +12,7 @@
 #include "ROMMetaDatabase.h"
 #include "NotificationSystem.h"
 #include "NDS.h"
+#include "RATracker.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -212,6 +213,30 @@ static void leaderboard_submitted(const rc_client_leaderboard_t* leaderboard)
   fflush(stdout);
 }
 
+static void leaderboard_tracker_update(const rc_client_leaderboard_tracker_t* tracker)
+{
+    std::string trackerId = std::to_string(tracker->id);
+
+    LeaderboardTracker* data = find_tracker(trackerId);
+    if (data) {
+        data->Update(tracker->display);
+    }
+}
+
+static void leaderboard_tracker_show(const rc_client_leaderboard_tracker_t* tracker)
+{
+    std::string trackerId = std::to_string(tracker->id);
+
+    create_tracker(trackerId, tracker->display);
+}
+
+static void leaderboard_tracker_hide(const rc_client_leaderboard_tracker_t* tracker)
+{
+    std::string trackerId = std::to_string(tracker->id);
+
+    destroy_tracker(trackerId);
+}
+
 /* -------------- LOGIC PROCESSING AND MEMORY --------------*/
 static void achievement_triggered(const rc_client_achievement_t* achievement)
 {
@@ -253,6 +278,15 @@ static void event_handler(const rc_client_event_t* event, rc_client_t* client)
       break;
     case RC_CLIENT_EVENT_LEADERBOARD_SUBMITTED:
       leaderboard_submitted(event->leaderboard);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_TRACKER_UPDATE:
+      leaderboard_tracker_update(event->leaderboard_tracker);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_TRACKER_SHOW:
+      leaderboard_tracker_show(event->leaderboard_tracker);
+      break;
+    case RC_CLIENT_EVENT_LEADERBOARD_TRACKER_HIDE:
+      leaderboard_tracker_hide(event->leaderboard_tracker);
       break;
     default:
       printf("RA: Unhandled event (%d)\n", event->type);
