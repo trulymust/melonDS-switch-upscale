@@ -76,8 +76,8 @@ ConfigEntry PlatformConfigFile[] =
 
     {"LimitFramerate",          0, &LimitFramerate,         1, NULL, 0},
 
-    {"RetroAchievementsUsername",   1, RetroAchievementsUsername,          0, "\0",   511},
-    {"RetroAchievementsToken",      1, RetroAchievementsToken,             0, "\0",   511},
+    {"RetroAchievementsUsername",   1, RetroAchievementsUsername,          0, "\0",   63},
+    {"RetroAchievementsToken",      1, RetroAchievementsToken,             0, "\0",   63},
 
     {"", -1, NULL, 0, NULL, 0}
 };

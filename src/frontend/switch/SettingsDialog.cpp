@@ -430,7 +430,7 @@ void DoGui(BoxGui::Frame& parent)
             int status = 0;
             static char username[64] = {0}, password[64] = {0};
 
-            if (strlen(Config::RetroAchievementsUsername) > 0) {
+            if (strlen(Config::RetroAchievementsUsername) > 0 && strlen(username) == 0) {
                 strncpy(username, Config::RetroAchievementsUsername, sizeof(username) - 1);
                 username[sizeof(username) - 1] = '\0';
             }
