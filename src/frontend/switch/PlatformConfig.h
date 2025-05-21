@@ -19,6 +19,7 @@ extern int ScreenLayout;
 extern int ScreenSwap;
 extern int ScreenSizing;
 extern int Filtering;
+extern int upscaleFactor;
 extern int IntegerScaling;
 extern int ScreenAspectTop;
 extern int ScreenAspectBot;

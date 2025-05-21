@@ -475,6 +475,7 @@ void DoGui(BoxGui::Frame& parent)
             DoCheckbox(settingsFrame, settingsSkewer, "Integer scaling", integerScaling);
             Config::IntegerScaling = integerScaling;
             DoCombobox(settingsFrame, settingsSkewer, "Filtering", "Nearest\0Linear\0", Config::Filtering);
+            DoCombobox(settingsFrame, settingsSkewer, "Upscaler", "1x\0002x\0003x\0004x\0", Config::upscaleFactor);
         }
         Emulation::UpdateScreenLayout();
         break;
