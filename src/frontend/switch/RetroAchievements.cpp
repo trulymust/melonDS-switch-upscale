@@ -46,6 +46,13 @@ static size_t switch_curl_write_image_callback(void* contents, size_t size, size
   return realsize;
 }
 
+static void server_error(const rc_client_server_error_t* error)
+{
+  char buffer[256];
+  printf("%s: %s", error->api, error->error_message);
+  g_notification.Show(error->error_message);
+}
+
 // This for download icons from rcheevos APIs
 int DownloadAndPackAvatar(const char* url,  int* outWidth, int* outHeight) {
   CURL* curl = curl_easy_init();
@@ -383,6 +390,9 @@ static void event_handler(const rc_client_event_t* event, rc_client_t* client)
       break;
     case RC_CLIENT_EVENT_GAME_COMPLETED:
       game_mastered();
+      break;
+    case RC_CLIENT_EVENT_SERVER_ERROR:
+      server_error(event->server_error);
       break;
     default:
       printf("RA: Unhandled event (%d)\n", event->type);
