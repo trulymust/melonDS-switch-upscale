@@ -40,6 +40,8 @@ extern int ShowPerformanceMetrics;
 extern char RetroAchievementsUsername[64];
 extern char RetroAchievementsToken[64];
 
+extern int hardcoreMode;
+
 }
 
 #endif

@@ -29,6 +29,7 @@ static bool g_login_successful = false;
 bool g_loadAchievements = true;
 std::vector<Achievement> g_achievements;
 const char* client = "melonDS/11.6 (Switch NX)";
+bool hardcore = false;
 
 /* -------------- SERVER COMUNICATION --------------*/
 
@@ -294,6 +295,26 @@ static void progress_indicator_hide(void)
   // TODO: hide_progress_indicator();
 }
 
+static void game_mastered(void)
+{
+  char message[128], submessage[128];
+  char url[128];
+  int textureId = -1, width, height;
+  
+  const rc_client_game_t* game = rc_client_get_game_info(g_client);
+
+  if (rc_client_game_get_image_url(game, url, sizeof(url)) == RC_OK)
+  {
+    int textureId = DownloadAndPackAvatar(url, &width, &height);
+    if (hardcore)
+      g_notification.ShowWithIcon(textureId, width, height, "Mastered %s\n%s", game->title, rc_client_get_user_info(g_client)->display_name);
+    else
+      g_notification.ShowWithIcon(textureId, width, height, "Completed %s\n%s", game->title, rc_client_get_user_info(g_client)->display_name);
+
+  }
+
+  // play_sound("mastery.wav");
+}
 /* -------------- LOGIC PROCESSING AND MEMORY --------------*/
 static void achievement_triggered(const rc_client_achievement_t* achievement)
 {
@@ -360,6 +381,9 @@ static void event_handler(const rc_client_event_t* event, rc_client_t* client)
     case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_HIDE:
       progress_indicator_hide();
       break;
+    case RC_CLIENT_EVENT_GAME_COMPLETED:
+      game_mastered();
+      break;
     default:
       printf("RA: Unhandled event (%d)\n", event->type);
       break;
@@ -399,7 +423,10 @@ void initialize_retroachievements_client(void)
 
   rc_client_set_event_handler(g_client, event_handler);
 
-  rc_client_set_hardcore_enabled(g_client, 0);
+  if (hardcore)
+    rc_client_set_hardcore_enabled(g_client, 1);
+  else 
+    rc_client_set_hardcore_enabled(g_client, 0);
 }
 
 void shutdown_retroachievements_client(void)

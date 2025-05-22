@@ -426,7 +426,7 @@ void DoGui(BoxGui::Frame& parent)
             Config::JIT_FastMemory = fastMemory;
         }
         {
-            bool loginRA = false;
+            bool loginRA = false, hardcore = Config::hardcoreMode;
             int status = 0;
             static char username[64] = {0}, password[64] = {0};
 
@@ -441,6 +441,9 @@ void DoGui(BoxGui::Frame& parent)
             DoCheckbox(settingsFrame, settingsSkewer, "Login", loginRA);
             if (loginRA)
                 InitRetroAchievements(username, password, false);
+
+            DoCheckbox(settingsFrame, settingsSkewer, "Hardcore Mode", hardcore);
+            Config::hardcoreMode = hardcore;
         }
         break;
     case uiScreen_DisplaySettings:

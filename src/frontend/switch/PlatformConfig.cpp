@@ -39,6 +39,8 @@ int ShowPerformanceMetrics;
 char RetroAchievementsUsername[64] = "";
 char RetroAchievementsToken[64] = "";
 
+int hardcoreMode = 0;
+
 ConfigEntry PlatformConfigFile[] =
 {
     {"GlobalRotation",          0, &GlobalRotation,         0, NULL, 0},
@@ -80,6 +82,8 @@ ConfigEntry PlatformConfigFile[] =
 
     {"RetroAchievementsUsername",   1, RetroAchievementsUsername,          0, "\0",   63},
     {"RetroAchievementsToken",      1, RetroAchievementsToken,             0, "\0",   63},
+
+    {"hardcoreMode",                0, &hardcoreMode,                      0, NULL,    0},
 
     {"", -1, NULL, 0, NULL, 0}
 };
