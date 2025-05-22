@@ -30,3 +30,5 @@ void resetRCClient();
 void capture_retroachievements_state(FILE* file);
 
 int restore_retroachievements_state(FILE* file);
+
+void rc_client_paused();

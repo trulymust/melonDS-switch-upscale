@@ -593,3 +593,7 @@ bool isConnected() {
 void resetRCClient() {
   rc_client_reset(g_client);
 }
+
+void rc_client_paused() {
+  rc_client_idle(g_client);
+}

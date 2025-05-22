@@ -778,6 +778,7 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
 
     if (State == emuState_Paused)
     {
+        rc_client_paused();
         Gfx::DrawRectangle({0.f, 0.f}, {1280.f, 1280.f}, DarkColorTransparent);
     }
 }
