@@ -412,6 +412,49 @@ uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_c
   return num_bytes;
 }
 
+void capture_retroachievements_state(FILE* file)
+{
+  const uint32_t buffer_size = (uint32_t)rc_client_progress_size(g_client);
+  uint8_t* buffer = (uint8_t*)malloc(buffer_size);
+  if (rc_client_serialize_progress(g_client, buffer) == RC_OK) {
+    // write a marker, the buffer size, then the buffer contents
+    fwrite("RCHV", 1, 4, file);
+    fwrite(&buffer_size, 1, sizeof(buffer_size), file); 
+    fwrite(buffer, 1, buffer_size, file);
+  }
+  free(buffer);
+}
+
+int restore_retroachievements_state(FILE* file)
+{
+  char marker[4];
+  uint32_t buffer_size;
+  uint8_t* buffer = NULL;
+  int result = 0;
+   
+  if (fread(marker, 1, 4, file) == 4 && memcmp(marker, "RCHV", 4) == 0) {
+    // found achievement data marker
+    if (fread(&buffer_size, 1, sizeof(buffer_size), file) == sizeof(buffer_size)) {
+      // allocate buffer
+      buffer = (uint8_t*)malloc(buffer_size);
+      if (buffer) {
+        if (fread(buffer, 1, buffer_size, file) != buffer_size) {
+          // failed to fill buffer, discard buffer
+          free(buffer);
+          buffer = NULL;
+        }
+      }
+    }
+  }      
+
+  result = (rc_client_deserialize_progress(g_client, buffer) == RC_OK) ? 1 : 0;
+
+  if (buffer)
+    free(buffer);
+
+  return result;
+}
+
 
 void rc_client_process_ra() {
   rc_client_do_frame(g_client);
@@ -545,4 +588,8 @@ bool isConnected() {
     return true;
   }
   return false;
+}
+
+void resetRCClient() {
+  rc_client_reset(g_client);
 }

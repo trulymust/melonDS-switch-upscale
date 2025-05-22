@@ -24,3 +24,9 @@ void rc_client_process_ra();
 bool isConnected();
 
 std::vector<Achievement> achievements_list();
+
+void resetRCClient();
+
+void capture_retroachievements_state(FILE* file);
+
+int restore_retroachievements_state(FILE* file);

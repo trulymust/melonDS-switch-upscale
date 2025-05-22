@@ -285,154 +285,155 @@ void DoGui(BoxGui::Frame& parent)
         else
         {
             BoxGui::Frame titleFrame{mainFrame, vskewer.Spit({0.f, TextLineHeight * 3.f}, Gfx::align_Right), {15.f, 15.f}, {15.f, 15.f}};
-            Gfx::DrawText(Gfx::SystemFontStandard, titleFrame.Area.Position, TextLineHeight * 2.5f, DarkColor, "Savestates");
+            if (!Config::hardcoreMode) {
+                Gfx::DrawText(Gfx::SystemFontStandard, titleFrame.Area.Position, TextLineHeight * 2.5f, DarkColor, "Savestates");
 
-            vskewer.Advance(20.f);
-
-            BoxGui::Frame saveTitleFrame{mainFrame, vskewer.Spit({0.f, TextLineHeight * 2.f}, Gfx::align_Right), {15.f, 0.f}};
-            Gfx::DrawText(Gfx::SystemFontStandard, saveTitleFrame.Area.Position, TextLineHeight*1.5f, DarkColor, "Save state");
-            vskewer.Advance(10.f);
-
-            BoxGui::Frame savestateFrame{mainFrame,
-                vskewer.Spit({mainFrame.Area.Size.X, TextLineHeight * 4.f}, Gfx::align_Right),
-                {0.f, 0.f}, {0.f, 0.f},
-                BoxGui::direction_Horizontal, BoxGui::MakeUniqueName("savestates", 42),
-                false, false};
-            Gfx::PushScissor(savestateFrame.Area.Position.X, savestateFrame.Area.Position.Y, savestateFrame.Area.Size.X, savestateFrame.Area.Size.Y);
-            BoxGui::Skewer savestateSkewer{savestateFrame, 0.f, BoxGui::direction_Horizontal};
-            savestateSkewer.AlignLeft(20.f);
-
-            int savestateSelected = -1;
-            for (u32 i = 0; i < 8; i++)
-            {
-                BoxGui::Frame savebutton{savestateFrame, savestateSkewer.Spit({TextLineHeight*4.f, TextLineHeight*4.f}, Gfx::align_Right), {5.f, 5.f}, {5.f, 5.f}};
-                Gfx::Color fontColor = SeparatorColor;
-                if (Config::ConsoleType != 1)
+                vskewer.Advance(20.f);
+    
+                BoxGui::Frame saveTitleFrame{mainFrame, vskewer.Spit({0.f, TextLineHeight * 2.f}, Gfx::align_Right), {15.f, 0.f}};
+                Gfx::DrawText(Gfx::SystemFontStandard, saveTitleFrame.Area.Position, TextLineHeight*1.5f, DarkColor, "Save state");
+                vskewer.Advance(10.f);
+    
+                BoxGui::Frame savestateFrame{mainFrame,
+                    vskewer.Spit({mainFrame.Area.Size.X, TextLineHeight * 4.f}, Gfx::align_Right),
+                    {0.f, 0.f}, {0.f, 0.f},
+                    BoxGui::direction_Horizontal, BoxGui::MakeUniqueName("savestates", 42),
+                    false, false};
+                Gfx::PushScissor(savestateFrame.Area.Position.X, savestateFrame.Area.Position.Y, savestateFrame.Area.Size.X, savestateFrame.Area.Size.Y);
+                BoxGui::Skewer savestateSkewer{savestateFrame, 0.f, BoxGui::direction_Horizontal};
+                savestateSkewer.AlignLeft(20.f);
+    
+                int savestateSelected = -1;
+                for (u32 i = 0; i < 8; i++)
                 {
-                    if (BoxGui::InputElement(savebutton, BoxGui::MakeUniqueName("savestate", i)))
+                    BoxGui::Frame savebutton{savestateFrame, savestateSkewer.Spit({TextLineHeight*4.f, TextLineHeight*4.f}, Gfx::align_Right), {5.f, 5.f}, {5.f, 5.f}};
+                    Gfx::Color fontColor = SeparatorColor;
+                    if (Config::ConsoleType != 1)
                     {
-                        savestateSelected = i;
-                        Gfx::DrawRectangle(savebutton.Area.Position, savebutton.Area.Size, WidgetColorVibrant, false);
+                        if (BoxGui::InputElement(savebutton, BoxGui::MakeUniqueName("savestate", i)))
+                        {
+                            savestateSelected = i;
+                            Gfx::DrawRectangle(savebutton.Area.Position, savebutton.Area.Size, WidgetColorVibrant, false);
+                        }
+                        fontColor = DarkColor;
                     }
-                    fontColor = DarkColor;
-                }
-                char label[2] = {'1', '\0'};
-                label[0] += i;
-                Gfx::DrawText(Gfx::SystemFontStandard,
-                    savebutton.Area.Position+savebutton.Area.Size*0.5f, TextLineHeight*1.5f,
-                    fontColor,
-                    Gfx::align_Center, Gfx::align_Center,
-                    label);
-            
-                if (i > 0)
-                {
-                    Gfx::DrawRectangle(savebutton.Area.Position - Gfx::Vector2f{5.f, 0.f}, {2.f, savebutton.Area.Size.Y-2.f*2.f}, SeparatorColor);
-                }
-            }
-            Gfx::PopScissor();
-            if (savestateSelected != -1)
-            {
-                KeyExplanation::Explain(KeyExplanation::button_A, "Save state");
-                if (BoxGui::ConfirmPressed())
-                {
-                    char filename[512];
-                    Frontend::GetSavestateName(savestateSelected + 1, filename, 512);
-                    if (Frontend::SaveState(filename))
-                        SavestateMask |= 1<<savestateSelected;
-                    else
-                        ErrorDialog::Open("Failed to create savestate");
-                }
-            }
-            vskewer.Advance(15.f);
-
-            BoxGui::Frame loadTitleFrame{mainFrame, vskewer.Spit({0.f, TextLineHeight * 2.f}, Gfx::align_Right), {15.f, 0.f}};
-            Gfx::DrawText(Gfx::SystemFontStandard, loadTitleFrame.Area.Position, TextLineHeight*1.5f, DarkColor, "Load state");
-            vskewer.Advance(10.f);
-
-            BoxGui::Frame loadstateFrame{mainFrame,
-                vskewer.Spit({mainFrame.Area.Size.X, TextLineHeight * 4.f}, Gfx::align_Right),
-                {0.f, 0.f}, {0.f, 0.f},
-                BoxGui::direction_Horizontal,
-                BoxGui::MakeUniqueName("savestates", 42),
-                false, false};
-            Gfx::PushScissor(loadstateFrame.Area.Position.X, loadstateFrame.Area.Position.Y, loadstateFrame.Area.Size.X, loadstateFrame.Area.Size.Y);
-            BoxGui::Skewer loadstateSkewer{loadstateFrame, 0.f, BoxGui::direction_Horizontal};
-            loadstateSkewer.AlignLeft(20.f);
-
-            int loadstateSelected = -1;
-            for (u32 i = 0; i < 9; i++)
-            {
-                BoxGui::Frame loadbutton{loadstateFrame, loadstateSkewer.Spit({TextLineHeight*4.f, TextLineHeight*4.f}, Gfx::align_Right), {5.f, 5.f}, {5.f, 5.f}};
-
-                Gfx::Color fontColor = SeparatorColor;
-                bool enabled = i < 8
-                    ? SavestateMask & (1<<i)
-                    : Frontend::SavestateLoaded;
-                if (enabled && Config::ConsoleType != 1)
-                {
-                    if (BoxGui::InputElement(loadbutton, BoxGui::MakeUniqueName("loadstate", i)))
-                    {
-                        loadstateSelected = i;
-                        Gfx::DrawRectangle(loadbutton.Area.Position, loadbutton.Area.Size, WidgetColorVibrant, false);
-                    }
-                    fontColor = DarkColor;
-                }
-                if (i == 8)
-                {
-                    Gfx::DrawText(Gfx::SystemFontStandard,
-                        loadbutton.Area.Position+loadbutton.Area.Size*0.5f, TextLineHeight,
-                        fontColor,
-                        Gfx::align_Center, Gfx::align_Center,
-                        "Undo\nload");
-                }
-                else
-                {
                     char label[2] = {'1', '\0'};
                     label[0] += i;
                     Gfx::DrawText(Gfx::SystemFontStandard,
-                        loadbutton.Area.Position+loadbutton.Area.Size*0.5f, TextLineHeight*1.5f,
+                        savebutton.Area.Position+savebutton.Area.Size*0.5f, TextLineHeight*1.5f,
                         fontColor,
                         Gfx::align_Center, Gfx::align_Center,
                         label);
+                
+                    if (i > 0)
+                    {
+                        Gfx::DrawRectangle(savebutton.Area.Position - Gfx::Vector2f{5.f, 0.f}, {2.f, savebutton.Area.Size.Y-2.f*2.f}, SeparatorColor);
+                    }
                 }
-
-                if (i > 0)
+                Gfx::PopScissor();
+                if (savestateSelected != -1)
                 {
-                    Gfx::DrawRectangle(loadbutton.Area.Position - Gfx::Vector2f{5.f, 0.f}, {2.f, loadbutton.Area.Size.Y-2.f*2.f}, SeparatorColor);
-                }
-            }
-            Gfx::PopScissor();
-
-            if (loadstateSelected != -1)
-            {
-                KeyExplanation::Explain(KeyExplanation::button_A, "Load state");
-                if (BoxGui::ConfirmPressed())
-                {
-                    bool loadedSuccessfully;
-                    if (loadstateSelected < 8)
+                    KeyExplanation::Explain(KeyExplanation::button_A, "Save state");
+                    if (BoxGui::ConfirmPressed())
                     {
                         char filename[512];
-                        Frontend::GetSavestateName(loadstateSelected + 1, filename, 512);
-                        loadedSuccessfully = Frontend::LoadState(filename);
+                        Frontend::GetSavestateName(savestateSelected + 1, filename, 512);
+                        if (Frontend::SaveState(filename))
+                            SavestateMask |= 1<<savestateSelected;
+                        else
+                            ErrorDialog::Open("Failed to create savestate");
+                    }
+                }
+                vskewer.Advance(15.f);
+    
+                BoxGui::Frame loadTitleFrame{mainFrame, vskewer.Spit({0.f, TextLineHeight * 2.f}, Gfx::align_Right), {15.f, 0.f}};
+                Gfx::DrawText(Gfx::SystemFontStandard, loadTitleFrame.Area.Position, TextLineHeight*1.5f, DarkColor, "Load state");
+                vskewer.Advance(10.f);
+    
+                BoxGui::Frame loadstateFrame{mainFrame,
+                    vskewer.Spit({mainFrame.Area.Size.X, TextLineHeight * 4.f}, Gfx::align_Right),
+                    {0.f, 0.f}, {0.f, 0.f},
+                    BoxGui::direction_Horizontal,
+                    BoxGui::MakeUniqueName("savestates", 42),
+                    false, false};
+                Gfx::PushScissor(loadstateFrame.Area.Position.X, loadstateFrame.Area.Position.Y, loadstateFrame.Area.Size.X, loadstateFrame.Area.Size.Y);
+                BoxGui::Skewer loadstateSkewer{loadstateFrame, 0.f, BoxGui::direction_Horizontal};
+                loadstateSkewer.AlignLeft(20.f);
+    
+                int loadstateSelected = -1;
+                for (u32 i = 0; i < 9; i++)
+                {
+                    BoxGui::Frame loadbutton{loadstateFrame, loadstateSkewer.Spit({TextLineHeight*4.f, TextLineHeight*4.f}, Gfx::align_Right), {5.f, 5.f}, {5.f, 5.f}};
+    
+                    Gfx::Color fontColor = SeparatorColor;
+                    bool enabled = i < 8
+                        ? SavestateMask & (1<<i)
+                        : Frontend::SavestateLoaded;
+                    if (enabled && Config::ConsoleType != 1)
+                    {
+                        if (BoxGui::InputElement(loadbutton, BoxGui::MakeUniqueName("loadstate", i)))
+                        {
+                            loadstateSelected = i;
+                            Gfx::DrawRectangle(loadbutton.Area.Position, loadbutton.Area.Size, WidgetColorVibrant, false);
+                        }
+                        fontColor = DarkColor;
+                    }
+                    if (i == 8)
+                    {
+                        Gfx::DrawText(Gfx::SystemFontStandard,
+                            loadbutton.Area.Position+loadbutton.Area.Size*0.5f, TextLineHeight,
+                            fontColor,
+                            Gfx::align_Center, Gfx::align_Center,
+                            "Undo\nload");
                     }
                     else
                     {
-                        Frontend::UndoStateLoad();
-                        loadedSuccessfully = true;
+                        char label[2] = {'1', '\0'};
+                        label[0] += i;
+                        Gfx::DrawText(Gfx::SystemFontStandard,
+                            loadbutton.Area.Position+loadbutton.Area.Size*0.5f, TextLineHeight*1.5f,
+                            fontColor,
+                            Gfx::align_Center, Gfx::align_Center,
+                            label);
                     }
-
-                    if (loadedSuccessfully)
+    
+                    if (i > 0)
                     {
-                        Emulation::SetPause(false);
-                        BoxGui::ForceSelecton(BoxGui::MakeUniqueName("sidebar", 0));
+                        Gfx::DrawRectangle(loadbutton.Area.Position - Gfx::Vector2f{5.f, 0.f}, {2.f, loadbutton.Area.Size.Y-2.f*2.f}, SeparatorColor);
                     }
-                    else
+                }
+                Gfx::PopScissor();
+    
+                if (loadstateSelected != -1)
+                {
+                    KeyExplanation::Explain(KeyExplanation::button_A, "Load state");
+                    if (BoxGui::ConfirmPressed())
                     {
-                        ErrorDialog::Open("Couldn't load savefile");
+                        bool loadedSuccessfully;
+                        if (loadstateSelected < 8)
+                        {
+                            char filename[512];
+                            Frontend::GetSavestateName(loadstateSelected + 1, filename, 512);
+                            loadedSuccessfully = Frontend::LoadState(filename);
+                        }
+                        else
+                        {
+                            Frontend::UndoStateLoad();
+                            loadedSuccessfully = true;
+                        }
+    
+                        if (loadedSuccessfully)
+                        {
+                            Emulation::SetPause(false);
+                            BoxGui::ForceSelecton(BoxGui::MakeUniqueName("sidebar", 0));
+                        }
+                        else
+                        {
+                            ErrorDialog::Open("Couldn't load savefile");
+                        }
                     }
                 }
             }
-            
         }
     }
 }

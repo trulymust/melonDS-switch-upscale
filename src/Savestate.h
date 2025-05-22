@@ -57,6 +57,8 @@ public:
         return false;
     }
 
+    FILE* GetFile() const { return file; }
+
 private:
     FILE* file;
 };

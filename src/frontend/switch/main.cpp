@@ -1084,6 +1084,8 @@ int main(int argc, const char* argv[])
     Emulation::DeInit();
     Frontend::DeInit_ROM();
 
+    resetRCClient();
+
     StartMenu::DeInit();
     Filebrowser::DeInit();
 

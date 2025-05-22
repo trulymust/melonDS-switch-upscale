@@ -33,6 +33,8 @@
 #include "DSi.h"
 #include "GBACart.h"
 
+#include "RetroAchievements.h"
+
 #include "AREngine.h"
 
 
@@ -815,6 +817,8 @@ bool SaveState(const char* filename)
         }
     }
 
+    capture_retroachievements_state(state->GetFile());
+
     return true;
 }
 
@@ -834,6 +838,8 @@ void UndoStateLoad()
         strncpy(SRAMPath[ROMSlot_NDS], PrevSRAMPath[ROMSlot_NDS], 1024);
         NDS::RelocateSave(SRAMPath[ROMSlot_NDS], false);
     }
+
+    restore_retroachievements_state(backup->GetFile());
 }
 
 int ImportSRAM(const char* filename)
