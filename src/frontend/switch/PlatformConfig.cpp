@@ -41,6 +41,8 @@ char RetroAchievementsToken[64] = "";
 
 int hardcoreMode = 0;
 
+int notification = 0;
+
 ConfigEntry PlatformConfigFile[] =
 {
     {"GlobalRotation",          0, &GlobalRotation,         0, NULL, 0},
@@ -84,6 +86,8 @@ ConfigEntry PlatformConfigFile[] =
     {"RetroAchievementsToken",      1, RetroAchievementsToken,             0, "\0",   63},
 
     {"hardcoreMode",                0, &hardcoreMode,                      0, NULL,    0},
+
+    {"notification",                0, &notification,                      0, NULL,    0},
 
     {"", -1, NULL, 0, NULL, 0}
 };

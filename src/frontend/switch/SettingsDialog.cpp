@@ -426,7 +426,7 @@ void DoGui(BoxGui::Frame& parent)
             Config::JIT_FastMemory = fastMemory;
         }
         {
-            bool loginRA = false, hardcore = Config::hardcoreMode;
+            bool loginRA = false, hardcore = Config::hardcoreMode, notification = Config::notification;
             int status = 0;
             static char username[64] = {0}, password[64] = {0};
 
@@ -444,6 +444,9 @@ void DoGui(BoxGui::Frame& parent)
 
             DoCheckbox(settingsFrame, settingsSkewer, "Hardcore Mode", hardcore);
             Config::hardcoreMode = hardcore;
+
+            DoCheckbox(settingsFrame, settingsSkewer, "Disable RA notifications", notification);
+            Config::notification = notification;
         }
         break;
     case uiScreen_DisplaySettings:
@@ -478,7 +481,7 @@ void DoGui(BoxGui::Frame& parent)
             DoCheckbox(settingsFrame, settingsSkewer, "Integer scaling", integerScaling);
             Config::IntegerScaling = integerScaling;
             DoCombobox(settingsFrame, settingsSkewer, "Filtering", "Nearest\0Linear\0", Config::Filtering);
-            DoCombobox(settingsFrame, settingsSkewer, "Upscaler", "1x\0002x\0003x\0004x\0", Config::upscaleFactor);
+            DoCombobox(settingsFrame, settingsSkewer, "Upscaler (NOT WORKING)", "1x\0002x\0003x\0004x\0", Config::upscaleFactor);
         }
         Emulation::UpdateScreenLayout();
         break;

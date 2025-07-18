@@ -42,7 +42,7 @@ void Notification::ShowWithIcon(int texId, int width, int height, const char* fm
 }
 
 void Notification::Render() {
-    if (!active)
+    if (!active || Config::notification)
         return;
 
     if (!persistent && difftime(time(nullptr), startTime) > durationSeconds) {

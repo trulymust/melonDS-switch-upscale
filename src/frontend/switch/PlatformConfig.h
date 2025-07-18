@@ -42,6 +42,8 @@ extern char RetroAchievementsToken[64];
 
 extern int hardcoreMode;
 
+extern int notification;
+
 }
 
 #endif
