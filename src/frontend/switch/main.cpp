@@ -688,18 +688,23 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
 
             bool fastForward = false;
             static bool fastForwardToggle = false;
+            static bool prevKeyPressed = false;
+
+            bool currentKeyPressed = Config::TouchscreenMode < 2 && (PlatformKeysHeld & (Config::LeftHandedMode ? HidNpadButton_ZR : HidNpadButton_ZL));
 
             if (Config::FastForward) {
                 // "Hold"
-                fastForward = Config::TouchscreenMode < 2
-                    && (PlatformKeysHeld & (Config::LeftHandedMode ? HidNpadButton_ZR : HidNpadButton_ZL));
+                fastForward = currentKeyPressed;
             } else {
-                // "Toggle"
-                if (Config::TouchscreenMode < 2 && (PlatformKeysHeld & (Config::LeftHandedMode ? HidNpadButton_ZR : HidNpadButton_ZL))) {
+                // "Toggle" on edge (press only)
+                if (currentKeyPressed && !prevKeyPressed)
                     fastForwardToggle = !fastForwardToggle;
-                }
+    
                 fastForward = fastForwardToggle;
             }
+
+            prevKeyPressed = currentKeyPressed;
+
 
             u64 totalFrameLength = 0;
             do {
