@@ -12,6 +12,12 @@
 #include "RetroAchievements.h"
 #include "NotificationSystem.h"
 
+namespace {
+    static u64 PlatformKeysHeld = 0;
+    static u64 PlatformKeysDown = 0;
+    static u64 PreviousKeys = 0;
+}
+
 namespace SettingsDialog
 {
 const char* SettingsPrefix = "settingsdialog_entries";
@@ -353,6 +359,133 @@ void DoLabel(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* text, bo
     }
 }
 
+const char* ButtonToString(u32 button)
+{
+    switch (button)
+    {
+        case HidNpadButton_A: return "A";
+        case HidNpadButton_B: return "B";
+        case HidNpadButton_X: return "X";
+        case HidNpadButton_Y: return "Y";
+        case HidNpadButton_L: return "L";
+        case HidNpadButton_R: return "R";
+        case HidNpadButton_ZL: return "ZL";
+        case HidNpadButton_ZR: return "ZR";
+        case HidNpadButton_Plus: return "+";
+        case HidNpadButton_Minus: return "-";
+        case HidNpadButton_StickL: return "L Stick";
+        case HidNpadButton_StickR: return "R Stick";
+        case HidNpadButton_Up: return "DPad Up";
+        case HidNpadButton_Down: return "DPad Down";
+        case HidNpadButton_Left: return "DPad Left";
+        case HidNpadButton_Right: return "DPad Right";
+        default: return "Unknown";
+    }
+}
+
+void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name, u32& mappedKey, bool first = false)
+{
+    BoxGui::Frame settingFrame{parent, skewer.Spit({parent.Area.Size.X, UIRowHeight}, Gfx::align_Right),
+        {5.f, 5.f}, {5.f, 5.f}};
+
+    bool selected = BoxGui::InputElement(settingFrame, BoxGui::MakeUniqueName(SettingsPrefix, BoxGui::MakeUniqueName(name, 0)));
+    if (selected && BoxGui::ConfirmPressed())
+    {
+        struct Dialog
+        {
+            const char* Name;
+            u32& MappedKey;
+            double StartTimestamp;
+            double EndTimestamp = -INFINITY;
+            bool inputCaptured = false;
+
+            bool operator()(BoxGui::Frame& rootFrame)
+            {
+                Gfx::Color color = DarkColor;
+                color.A = (float)std::min((Gfx::AnimationTimestamp - StartTimestamp) * 5.0, 0.8);
+                Gfx::DrawRectangle(rootFrame.Area.Position, rootFrame.Area.Size, color);
+
+                Gfx::Vector2f Size = rootFrame.Area.Size * 0.9f;
+                Size.X = std::min(Size.X, 720.f);
+                BoxGui::Frame dialogFrame{rootFrame, rootFrame.Area.CenteredChild(Size)};
+                Gfx::DrawRectangle(dialogFrame.Area.Position, dialogFrame.Area.Size, WidgetColorBright, true);
+
+                BoxGui::Skewer dialogSkewer{dialogFrame, 0.f, BoxGui::direction_Vertical};
+                dialogSkewer.AlignLeft(30.f);
+
+                BoxGui::Frame titleFrame{dialogFrame, dialogSkewer.Spit({dialogFrame.Area.Size.X, TextLineHeight * 2.f}, Gfx::align_Right), {5.f, 5.f}, {5.f, 5.f}};
+                Gfx::DrawText(Gfx::SystemFontStandard, titleFrame.Area.Position + Gfx::Vector2f{15.f, 0.f}, TextLineHeight * 2.f, DarkColor,
+                    Gfx::align_Left, Gfx::align_Left, Name);
+
+                dialogSkewer.Advance(10.f);
+
+                // Messaggio "waiting for input..."
+                BoxGui::Frame msgFrame{dialogFrame, dialogSkewer.Spit({dialogFrame.Area.Size.X, TextLineHeight * 2.f}, Gfx::align_Right), {5.f, 5.f}, {5.f, 5.f}};
+                Gfx::DrawText(Gfx::SystemFontStandard, msgFrame.Area.Position + Gfx::Vector2f{15.f, 0.f}, TextLineHeight * 1.5f, DarkColor,
+                    Gfx::align_Left, Gfx::align_Left, "Waiting for input...");
+
+                // Capture input
+                if (!inputCaptured)
+                {
+                    u64 keys = PlatformKeysDown;
+                    if (keys != 0)
+                    {
+                        for (u32 i = 0; i < 32; ++i)
+                        {
+                            if (keys & (1u << i))
+                            {
+                                MappedKey = (1u << i);
+                                inputCaptured = true;
+                                EndTimestamp = Gfx::AnimationTimestamp;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Annulla se premi B
+                if (BoxGui::CancelPressed())
+                    EndTimestamp = 0.f;
+
+                KeyExplanation::Explain(KeyExplanation::button_B, "Cancel");
+                KeyExplanation::DoGui(rootFrame);
+
+                const double fadeoutLength = 0.25;
+                return EndTimestamp < 0.0 || Gfx::AnimationTimestamp - EndTimestamp < fadeoutLength;
+            }
+        };
+
+        BoxGui::OpenModalDialog(Dialog{name, mappedKey, Gfx::AnimationTimestamp});
+    }
+
+    if (selected)
+    {
+        KeyExplanation::Explain(KeyExplanation::button_A, "Remap");
+    }
+
+    Gfx::DrawRectangle(settingFrame.Area.Position - Gfx::Vector2f{0.f, 5.f}, settingFrame.Area.Size + Gfx::Vector2f{0.f, 5.f*2.f}, WidgetColorBright, true);
+    if (selected)
+        Gfx::DrawRectangle(settingFrame.Area.Position, settingFrame.Area.Size, WidgetColorVibrant);
+
+    BoxGui::Skewer settingSkewer{settingFrame, settingFrame.Area.Size.Y / 2.f, BoxGui::direction_Horizontal};
+
+    settingSkewer.AlignLeft(20.f);
+    Gfx::DrawText(Gfx::SystemFontStandard, settingSkewer.CurrentPosition(), TextLineHeight, DarkColor,
+        Gfx::align_Left, Gfx::align_Center, name);
+
+    const char* keyName = ButtonToString(mappedKey);
+    settingSkewer.AlignRight(20.f);
+    Gfx::DrawText(Gfx::SystemFontStandard, settingSkewer.CurrentPosition(), TextLineHeight, DarkColor,
+        Gfx::align_Right, Gfx::align_Center, keyName);
+
+    if (!first)
+    {
+        Gfx::DrawRectangle(settingFrame.Area.Position + Gfx::Vector2f{10.f, -(5.f + 1.f)},
+            {settingFrame.Area.Size.X - 2*10.f, 2.f},
+            SeparatorColor);
+    }
+}
+
 void ShowImage(BoxGui::Frame& parent, BoxGui::Skewer& skewer, int textureId, int nwidth, int nheight, float imageSize = 64.f)
 {
     if (textureId < 0 || nwidth <= 0 || nheight <= 0)
@@ -522,6 +655,16 @@ void DoGui(BoxGui::Frame& parent)
             bool fastforward = Config::FastForward;
             DoCheckbox(settingsFrame, settingsSkewer, "Hold to fastforward (ZL)", fastforward);
             Config::FastForward = fastforward;
+        }
+        {
+            bool defaultMapping = false;
+            static u32 remappedA = HidNpadButton_A;
+
+            SectionHeader(settingsFrame, settingsSkewer, "Buttons Remapping");
+            DoInputButton(settingsFrame, settingsSkewer, "A: ", remappedA);
+            DoCheckbox(settingsFrame, settingsSkewer, "Reset to default", defaultMapping);
+
+
         }
         break;
     }
