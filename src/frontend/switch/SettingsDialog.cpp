@@ -5,6 +5,8 @@
 #include "BackButton.h"
 #include "main.h"
 
+#include <switch.h>
+
 #include "PlatformConfig.h"
 
 #include <string.h>
@@ -17,6 +19,9 @@ namespace {
     static u64 PlatformKeysDown = 0;
     static u64 PreviousKeys = 0;
 }
+
+static PadState pad;
+static bool pad_initialized = false;
 
 namespace SettingsDialog
 {
@@ -419,22 +424,31 @@ void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
 
                 dialogSkewer.Advance(10.f);
 
-                // Messaggio "waiting for input..."
                 BoxGui::Frame msgFrame{dialogFrame, dialogSkewer.Spit({dialogFrame.Area.Size.X, TextLineHeight * 2.f}, Gfx::align_Right), {5.f, 5.f}, {5.f, 5.f}};
                 Gfx::DrawText(Gfx::SystemFontStandard, msgFrame.Area.Position + Gfx::Vector2f{15.f, 0.f}, TextLineHeight * 1.5f, DarkColor,
                     Gfx::align_Left, Gfx::align_Left, "Waiting for input...");
 
-                // Capture input
-                if (!inputCaptured)
+                const double elapsedInput = Gfx::AnimationTimestamp - StartTimestamp;
+
+                if (!inputCaptured && elapsedInput > 0.3)
                 {
-                    u64 keys = PlatformKeysDown;
+                    static PadState pad;
+                    static bool padInitialized = false;
+                    if (!padInitialized) {
+                        padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+                        padInitializeAny(&pad);
+                        padInitialized = true;
+                    }
+                    padUpdate(&pad);
+                    u64 keys = padGetButtonsDown(&pad);
                     if (keys != 0)
                     {
-                        for (u32 i = 0; i < 32; ++i)
+                        for (u32 i = 0; i < 64; ++i)
                         {
-                            if (keys & (1u << i))
+                            u64 buttonMask = (1ULL << i);
+                            if (keys & buttonMask)
                             {
-                                MappedKey = (1u << i);
+                                MappedKey = static_cast<u32>(buttonMask);
                                 inputCaptured = true;
                                 EndTimestamp = Gfx::AnimationTimestamp;
                                 break;
@@ -443,8 +457,8 @@ void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
                     }
                 }
 
-                // Annulla se premi B
-                if (BoxGui::CancelPressed())
+                const double elapsed = Gfx::AnimationTimestamp - StartTimestamp;
+                if (elapsed > 10.0 || BoxGui::CancelPressed())
                     EndTimestamp = 0.f;
 
                 KeyExplanation::Explain(KeyExplanation::button_B, "Cancel");
@@ -485,6 +499,24 @@ void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
             SeparatorColor);
     }
 }
+
+const char* GetButtonName(u32 key)
+{
+    switch (key) {
+        case HidNpadButton_A: return "A";
+        case HidNpadButton_B: return "B";
+        case HidNpadButton_X: return "X";
+        case HidNpadButton_Y: return "Y";
+        case HidNpadButton_L: return "L";
+        case HidNpadButton_R: return "R";
+        case HidNpadButton_ZL: return "ZL";
+        case HidNpadButton_ZR: return "ZR";
+        case HidNpadButton_Plus: return "+";
+        case HidNpadButton_Minus: return "-";
+        default: return "Unknown";
+    }
+}
+
 
 void ShowImage(BoxGui::Frame& parent, BoxGui::Skewer& skewer, int textureId, int nwidth, int nheight, float imageSize = 64.f)
 {
@@ -641,6 +673,14 @@ void DoGui(BoxGui::Frame& parent)
         break;
     case uiScreen_InputSettings:
         title = "Input settings";
+
+        if (!pad_initialized) {
+            padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+            padInitializeAny(&pad);
+            pad_initialized = true;
+        }
+
+        padUpdate(&pad);
         {
             SectionHeader(settingsFrame, settingsSkewer, "Touchscreen");
             
@@ -657,7 +697,7 @@ void DoGui(BoxGui::Frame& parent)
             Config::FastForward = fastforward;
         }
         {
-            bool defaultMapping = false;
+            static bool defaultMapping = false;
             static u32 remappedA = HidNpadButton_A;
 
             SectionHeader(settingsFrame, settingsSkewer, "Buttons Remapping");
