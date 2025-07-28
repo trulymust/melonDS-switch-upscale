@@ -8,6 +8,7 @@
 #include <switch.h>
 
 #include "PlatformConfig.h"
+#include "InputConfig.h"
 
 #include <string.h>
 
@@ -388,7 +389,7 @@ const char* ButtonToString(u32 button)
     }
 }
 
-void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name, u32& mappedKey, bool first = false)
+void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name, u64& mappedKey, bool first = false)
 {
     BoxGui::Frame settingFrame{parent, skewer.Spit({parent.Area.Size.X, UIRowHeight}, Gfx::align_Right),
         {5.f, 5.f}, {5.f, 5.f}};
@@ -399,7 +400,7 @@ void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
         struct Dialog
         {
             const char* Name;
-            u32& MappedKey;
+            u64& MappedKey;
             double StartTimestamp;
             double EndTimestamp = -INFINITY;
             bool inputCaptured = false;
@@ -698,7 +699,7 @@ void DoGui(BoxGui::Frame& parent)
         }
         {
             static bool defaultMapping = false;
-            static u32 remappedA = HidNpadButton_A;
+            u64& remappedA = InputConfig::ButtonA;
 
             SectionHeader(settingsFrame, settingsSkewer, "Buttons Remapping");
             DoInputButton(settingsFrame, settingsSkewer, "A: ", remappedA);

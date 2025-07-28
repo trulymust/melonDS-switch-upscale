@@ -13,6 +13,7 @@
 #include "NotificationSystem.h"
 #include "NDS.h"
 #include "RATracker.h"
+#include "version.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -22,16 +23,38 @@ extern "C" {
     #include <rc_client.h>
     #include <rc_consoles.h>
 }
-  
+
 static std::string g_response;
 rc_client_t* g_client = NULL;
 static bool g_login_successful = false;
 bool g_loadAchievements = true;
 std::vector<Achievement> g_achievements;
-const char* client = "melonDS/11.6 (Switch NX)";
+const char* client = "Gheovgos-melonDS/" PROJECT_VERSION " (Switch NX)";
 bool hardcore = false;
 
 /* -------------- SERVER COMUNICATION --------------*/
+
+bool IsNetworkAvailable() {
+    Result rc;
+
+    NifmInternetConnectionType connType;
+    u32 wifiStrength = 0;
+    NifmInternetConnectionStatus connStatus;
+
+    rc = nifmInitialize(NifmServiceType_User);
+    if (R_FAILED(rc)) {
+        return false;
+    }
+
+    rc = nifmGetInternetConnectionStatus(&connType, &wifiStrength, &connStatus);
+    nifmExit();
+
+    if (R_SUCCEEDED(rc)) {
+        return (connStatus == NifmInternetConnectionStatus_Connected);
+    }
+
+    return false;
+}
 
 static size_t switch_curl_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t realsize = size * nmemb;
@@ -586,6 +609,9 @@ void load_game_from_file(const char* path)
 /* -------------- INITIALIZATION --------------*/
 
 void InitRetroAchievements(const char* username, const char* password, bool isToken) {
+  if (!IsNetworkAvailable())
+    return;
+    
   initialize_retroachievements_client();
 
   if(isToken) rc_client_begin_login_with_token(g_client, username, password, login_callback, NULL);

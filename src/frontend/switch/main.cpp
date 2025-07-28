@@ -1038,8 +1038,7 @@ int main(int argc, const char* argv[])
         {
             Emulation::UpdateAndDraw(keysDown, keysUp);
         }
-        // the way we process input is weird, but we want to poll late
-        // so we have to do some gymnastics
+
         if (Emulation::State != Emulation::emuState_Running)
         {
             padUpdate(&Pad);
