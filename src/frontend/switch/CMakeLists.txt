@@ -18,6 +18,7 @@ SET(SOURCES_SWITCH
     UploadBuffer.cpp
     RetroAchievements.cpp
     NotificationSystem.cpp
+    InputConfig.cpp
     RATracker.cpp
     ../Util_ROM.cpp
     ../Util_Audio.cpp

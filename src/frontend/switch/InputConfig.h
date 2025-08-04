@@ -1,14 +1,24 @@
 #pragma once
 #include <switch.h>
+#include <unordered_map>
+#include <functional>
 
 namespace InputConfig {
-    //TODO: Other keys here
+
     inline u64 ButtonA = HidNpadButton_A;
     inline u64 ButtonB = HidNpadButton_B;
     inline u64 ButtonX = HidNpadButton_X;
     inline u64 ButtonY = HidNpadButton_Y;
+    inline u64 ButtonStart = HidNpadButton_Plus;
+    inline u64 ButtonSelect = HidNpadButton_Minus;
+    inline u64 ButtonL = HidNpadButton_L;
+    inline u64 ButtonR = HidNpadButton_R;
+    inline u64 ButtonUp = HidNpadButton_Up;
+    inline u64 ButtonDown = HidNpadButton_Down;
+    inline u64 ButtonLeft = HidNpadButton_Left;
+    inline u64 ButtonRight = HidNpadButton_Right;
 
-    //TODO: Other keys
+
     inline void ResetToDefault() {
         ButtonA = HidNpadButton_A;
         ButtonB = HidNpadButton_B;
@@ -21,6 +31,14 @@ namespace InputConfig {
         LogicalB = 1 << 1,
         LogicalX = 1 << 2,
         LogicalY = 1 << 3,
+        LogicalStart  = 1 << 4,
+        LogicalSelect = 1 << 5,
+        LogicalL      = 1 << 6,
+        LogicalR      = 1 << 7,
+        LogicalUp     = 1 << 8,
+        LogicalDown   = 1 << 9,
+        LogicalLeft   = 1 << 10,
+        LogicalRight  = 1 << 11,
     };
 
     inline u64 GetLogicalKeysDown(u64 physicalKeysDown) {
@@ -29,6 +47,22 @@ namespace InputConfig {
         if (physicalKeysDown & ButtonB) logical |= LogicalB;
         if (physicalKeysDown & ButtonX) logical |= LogicalX;
         if (physicalKeysDown & ButtonY) logical |= LogicalY;
+        if (physicalKeysDown & ButtonStart) logical |= LogicalStart;
+        if (physicalKeysDown & ButtonSelect) logical |= LogicalSelect;
+        if (physicalKeysDown & ButtonL) logical |= LogicalL;
+        if (physicalKeysDown & ButtonR) logical |= LogicalR;
+        if (physicalKeysDown & ButtonUp) logical |= LogicalUp;
+        if (physicalKeysDown & ButtonDown) logical |= LogicalDown;
+        if (physicalKeysDown & ButtonLeft) logical |= LogicalLeft;
+        if (physicalKeysDown & ButtonRight) logical |= LogicalRight;
         return logical;
     }
+
+    using LogicalAction = LogicalButton;
+
+    u64 getPhysicalKeysFromLogical(u64 logicalKeys);
+
+
+    extern std::unordered_map<LogicalAction, std::function<void()>> actionMap;
+    void setupInputActions();
 }

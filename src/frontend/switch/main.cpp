@@ -36,6 +36,7 @@
 #include "RetroAchievements.h"
 #include "NotificationSystem.h"
 #include "RATracker.h"
+#include "InputConfig.h"
 
 bool Done = false;
 int CurrentUiScreen = uiScreen_Start;
@@ -373,9 +374,19 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
 
     if (State == emuState_Running)
     {
+        
         padUpdate(&Pad);
-        keysDown = padGetButtonsDown(&Pad);
-        keysUp = padGetButtonsUp(&Pad);
+        u64 rawKeysDown = padGetButtonsDown(&Pad);
+        u64 rawKeysUp = padGetButtonsUp(&Pad);
+
+        u64 logicalKeysDown = InputConfig::GetLogicalKeysDown(rawKeysDown);
+        u64 logicalKeysUp = InputConfig::GetLogicalKeysDown(rawKeysUp);
+
+        for (const auto& [logicalKey, action] : InputConfig::actionMap)
+        {
+            if (logicalKeysDown & logicalKey)
+                action();
+        }
 
         PlatformKeysHeld |= keysDown;
         PlatformKeysHeld &= ~keysUp;
@@ -984,6 +995,7 @@ int main(int argc, const char* argv[])
     padInitializeDefault(&Pad);
 
     hidInitializeTouchScreen();
+    InputConfig::setupInputActions();
 
     Gfx::Init();
 
@@ -1033,17 +1045,25 @@ int main(int argc, const char* argv[])
         Gfx::PushScissor(0, 0, screenWidth, screenHeight);
         BoxGui::Frame rootFrame{Gfx::Vector2f{(float)screenWidth, (float)screenHeight}};
 
-        u64 keysUp, keysDown;
-        if (Emulation::State != Emulation::emuState_Nothing)
+        padUpdate(&Pad);
+        u64 rawKeysDown = padGetButtonsDown(&Pad);
+        u64 rawKeysUp = padGetButtonsUp(&Pad);
+
+        u64 logicalKeysDown = InputConfig::GetLogicalKeysDown(rawKeysDown);
+        u64 logicalKeysUp = InputConfig::GetLogicalKeysDown(rawKeysUp);
+
+        for (const auto& [logicalKey, action] : InputConfig::actionMap)
         {
-            Emulation::UpdateAndDraw(keysDown, keysUp);
+            if (logicalKeysDown & logicalKey)
+                action();
         }
 
-        if (Emulation::State != Emulation::emuState_Running)
+        u64 remappedKeysDown = InputConfig::getPhysicalKeysFromLogical(logicalKeysDown);
+        u64 remappedKeysUp = InputConfig::getPhysicalKeysFromLogical(logicalKeysUp);
+
+        if (Emulation::State != Emulation::emuState_Nothing)
         {
-            padUpdate(&Pad);
-            keysDown = padGetButtonsDown(&Pad);
-            keysUp = padGetButtonsUp(&Pad);
+            Emulation::UpdateAndDraw(logicalKeysDown, logicalKeysUp);
         }
 
         switch (CurrentUiScreen)
@@ -1074,7 +1094,7 @@ int main(int argc, const char* argv[])
         else
             KeyExplanation::Reset();
 
-        BoxGui::Update(rootFrame, keysDown, keysUp);
+        BoxGui::Update(rootFrame, rawKeysDown, rawKeysUp);
         g_notification.Render();
         for (auto& [id, tracker] : g_leaderboardTrackers) {
             tracker.Render();
