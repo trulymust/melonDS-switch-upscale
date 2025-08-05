@@ -374,7 +374,7 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
 
     if (State == emuState_Running)
     {
-        
+        // Solo ABXY funzionano. Tutto il resto è scambiato in modo strano, per esempio sx è start e così via. Va sistemato  
         padUpdate(&Pad);
         u64 rawKeysDown = padGetButtonsDown(&Pad);
         u64 rawKeysUp = padGetButtonsUp(&Pad);

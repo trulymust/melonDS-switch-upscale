@@ -699,12 +699,26 @@ void DoGui(BoxGui::Frame& parent)
         }
         {
             static bool defaultMapping = false;
-            u64& remappedA = InputConfig::ButtonA;
 
             SectionHeader(settingsFrame, settingsSkewer, "Buttons Remapping");
-            DoInputButton(settingsFrame, settingsSkewer, "A: ", remappedA);
+
+            DoInputButton(settingsFrame, settingsSkewer, "A: ", InputConfig::ButtonA);
+            DoInputButton(settingsFrame, settingsSkewer, "B: ", InputConfig::ButtonB);
+            DoInputButton(settingsFrame, settingsSkewer, "X: ", InputConfig::ButtonX);
+            DoInputButton(settingsFrame, settingsSkewer, "Y: ", InputConfig::ButtonY);
+            DoInputButton(settingsFrame, settingsSkewer, "Start: ", InputConfig::ButtonStart);
+            DoInputButton(settingsFrame, settingsSkewer, "Select: ", InputConfig::ButtonSelect);
+            DoInputButton(settingsFrame, settingsSkewer, "L: ", InputConfig::ButtonL);
+            DoInputButton(settingsFrame, settingsSkewer, "R: ", InputConfig::ButtonR);
+            DoInputButton(settingsFrame, settingsSkewer, "Up: ", InputConfig::ButtonUp);
+            DoInputButton(settingsFrame, settingsSkewer, "Down: ", InputConfig::ButtonDown);
+            DoInputButton(settingsFrame, settingsSkewer, "Left: ", InputConfig::ButtonLeft);
+            DoInputButton(settingsFrame, settingsSkewer, "Right: ", InputConfig::ButtonRight);
+            
             DoCheckbox(settingsFrame, settingsSkewer, "Reset to default", defaultMapping);
 
+            if (defaultMapping)
+                InputConfig::ResetToDefault();
 
         }
         break;

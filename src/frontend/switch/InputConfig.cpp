@@ -7,15 +7,41 @@ namespace InputConfig {
 
     std::unordered_map<LogicalAction, std::function<void()>> actionMap;
 
-    void setupInputActions()
-    {
-        actionMap[LogicalA] = []() {
-            printf("A premuto\n");
-        };
-        actionMap[LogicalB] = []() {
-            printf("B premuto\n");
-        };
+    void setupInputActions() {
+
+        actionMap[LogicalA] = []() { };
+
+        actionMap[LogicalB] = []() {};
+
+        actionMap[LogicalX] = []() {};
+
+        actionMap[LogicalY] = []() {};
+
+        actionMap[LogicalStart] = []() {};
+
+        actionMap[LogicalSelect] = []() {};
+
+        actionMap[LogicalL] = []() {};
+
+        actionMap[LogicalR] = []() {};
+
+        actionMap[LogicalUp] = []() {};
+
+        actionMap[LogicalDown] = []() {};
+
+        actionMap[LogicalLeft] = []() {};
+
+        actionMap[LogicalRight] = []() {};
+
+        actionMap[LogicalZL] = []() {};
+
+        actionMap[LogicalZR] = []() {};
+
+        actionMap[LogicalStickL] = []() {};
+
+        actionMap[LogicalStickR] = []() {};
     }
+
 
     u64 getPhysicalKeysFromLogical(u64 logicalKeys) {
         u64 physical = 0;
