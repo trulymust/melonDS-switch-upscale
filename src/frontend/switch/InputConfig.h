@@ -143,6 +143,10 @@ namespace InputConfig {
 
     u64 getPhysicalKeysFromLogical(u64 logicalKeys);
 
+    void saveMappingToFile(const char* path);
+    void loadMappingFromFile(const char* path);
+
+
 
     extern std::unordered_map<LogicalAction, std::function<void()>> actionMap;
     void setupInputActions();

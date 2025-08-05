@@ -512,7 +512,6 @@ const char* GetButtonName(u32 key)
         case HidNpadButton_StickL: return "L Stick Button";
         case HidNpadButton_StickR: return "R Stick Button";
 
-
         case HidNpadButton_L: return "L";
         case HidNpadButton_R: return "R";
         case HidNpadButton_ZL: return "ZL";
@@ -727,6 +726,9 @@ void DoGui(BoxGui::Frame& parent)
         {
             static bool defaultMapping = false;
 
+            static bool saveMapping = false;
+            static bool loadMapping = false;
+
             SectionHeader(settingsFrame, settingsSkewer, "Buttons Remapping");
 
             DoInputButton(settingsFrame, settingsSkewer, "A: ", InputConfig::ButtonA);
@@ -762,9 +764,23 @@ void DoGui(BoxGui::Frame& parent)
             DoInputButton(settingsFrame, settingsSkewer, "Right SR: ", InputConfig::ButtonRightSR);
             
             DoCheckbox(settingsFrame, settingsSkewer, "Reset to default", defaultMapping);
+            DoCheckbox(settingsFrame, settingsSkewer, "Save this configuration", saveMapping);
+            DoCheckbox(settingsFrame, settingsSkewer, "Load old configuration", loadMapping);
 
-            if (defaultMapping)
+            if (defaultMapping) {
                 InputConfig::ResetToDefault();
+                defaultMapping = false;
+            }
+
+            if (loadMapping) {
+                InputConfig::loadMappingFromFile("sdmc:/switch/melonDS/input.cfg");
+                loadMapping = false;
+            }
+
+            if (saveMapping) {
+                InputConfig::saveMappingToFile("sdmc:/switch/melonDS/input.cfg");
+                saveMapping = false;
+            }    
 
         }
         break;
