@@ -706,14 +706,33 @@ void DoGui(BoxGui::Frame& parent)
             DoInputButton(settingsFrame, settingsSkewer, "B: ", InputConfig::ButtonB);
             DoInputButton(settingsFrame, settingsSkewer, "X: ", InputConfig::ButtonX);
             DoInputButton(settingsFrame, settingsSkewer, "Y: ", InputConfig::ButtonY);
-            DoInputButton(settingsFrame, settingsSkewer, "Start: ", InputConfig::ButtonStart);
-            DoInputButton(settingsFrame, settingsSkewer, "Select: ", InputConfig::ButtonSelect);
+            DoInputButton(settingsFrame, settingsSkewer, "Left Stick Button: ", InputConfig::ButtonStickL);
+            DoInputButton(settingsFrame, settingsSkewer, "Right Stick Button: ", InputConfig::ButtonStickR);
             DoInputButton(settingsFrame, settingsSkewer, "L: ", InputConfig::ButtonL);
             DoInputButton(settingsFrame, settingsSkewer, "R: ", InputConfig::ButtonR);
+            DoInputButton(settingsFrame, settingsSkewer, "ZL: ", InputConfig::ButtonZL);
+            DoInputButton(settingsFrame, settingsSkewer, "ZR: ", InputConfig::ButtonZR);
+            DoInputButton(settingsFrame, settingsSkewer, "Start: ", InputConfig::ButtonStart);
+            DoInputButton(settingsFrame, settingsSkewer, "Select: ", InputConfig::ButtonSelect);
             DoInputButton(settingsFrame, settingsSkewer, "Up: ", InputConfig::ButtonUp);
             DoInputButton(settingsFrame, settingsSkewer, "Down: ", InputConfig::ButtonDown);
             DoInputButton(settingsFrame, settingsSkewer, "Left: ", InputConfig::ButtonLeft);
             DoInputButton(settingsFrame, settingsSkewer, "Right: ", InputConfig::ButtonRight);
+
+            DoInputButton(settingsFrame, settingsSkewer, "Left Stick Up: ", InputConfig::ButtonStickLUp);
+            DoInputButton(settingsFrame, settingsSkewer, "Left Stick Right: ", InputConfig::ButtonStickLRight);
+            DoInputButton(settingsFrame, settingsSkewer, "Left Stick Down: ", InputConfig::ButtonStickLDown);
+            DoInputButton(settingsFrame, settingsSkewer, "Left Stick Left: ", InputConfig::ButtonStickLLeft);
+
+            DoInputButton(settingsFrame, settingsSkewer, "Right Stick Up: ", InputConfig::ButtonStickRUp);
+            DoInputButton(settingsFrame, settingsSkewer, "Right Stick Right: ", InputConfig::ButtonStickRRight);
+            DoInputButton(settingsFrame, settingsSkewer, "Right Stick Down: ", InputConfig::ButtonStickRDown);
+            DoInputButton(settingsFrame, settingsSkewer, "Right Stick Left: ", InputConfig::ButtonStickRLeft);
+
+            DoInputButton(settingsFrame, settingsSkewer, "Left SL: ", InputConfig::ButtonLeftSL);
+            DoInputButton(settingsFrame, settingsSkewer, "Left SR ", InputConfig::ButtonLeftSR);
+            DoInputButton(settingsFrame, settingsSkewer, "Right SL: ", InputConfig::ButtonRightSL);
+            DoInputButton(settingsFrame, settingsSkewer, "Right SR: ", InputConfig::ButtonRightSR);
             
             DoCheckbox(settingsFrame, settingsSkewer, "Reset to default", defaultMapping);
 

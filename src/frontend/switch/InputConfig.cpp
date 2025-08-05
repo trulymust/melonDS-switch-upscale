@@ -17,13 +17,21 @@ namespace InputConfig {
 
         actionMap[LogicalY] = []() {};
 
-        actionMap[LogicalStart] = []() {};
+        actionMap[LogicalStickL] = []() {};
 
-        actionMap[LogicalSelect] = []() {};
+        actionMap[LogicalStickR] = []() {};
 
         actionMap[LogicalL] = []() {};
 
         actionMap[LogicalR] = []() {};
+
+        actionMap[LogicalZL] = []() {};
+
+        actionMap[LogicalZR] = []() {};
+
+        actionMap[LogicalStart] = []() {};
+
+        actionMap[LogicalSelect] = []() {};
 
         actionMap[LogicalUp] = []() {};
 
@@ -33,13 +41,29 @@ namespace InputConfig {
 
         actionMap[LogicalRight] = []() {};
 
-        actionMap[LogicalZL] = []() {};
+        actionMap[LogicalStickLLeft] = []() {};
 
-        actionMap[LogicalZR] = []() {};
+        actionMap[LogicalStickLUp] = []() {};
 
-        actionMap[LogicalStickL] = []() {};
+        actionMap[LogicalStickLRight] = []() {};
 
-        actionMap[LogicalStickR] = []() {};
+        actionMap[LogicalStickLDown] = []() {};
+
+        actionMap[LogicalStickRLeft] = []() {};
+
+        actionMap[LogicalStickRUp] = []() {};
+
+        actionMap[LogicalStickRRight] = []() {};
+
+        actionMap[LogicalStickRDown] = []() {};
+
+        actionMap[LogicalLeftSL] = []() {};
+
+        actionMap[LogicalLeftSR] = []() {};
+
+        actionMap[LogicalRightSL] = []() {};
+
+        actionMap[LogicalRightSL] = []() {};
     }
 
 
@@ -49,14 +73,39 @@ namespace InputConfig {
         if (logicalKeys & LogicalB) physical |= ButtonB;
         if (logicalKeys & LogicalX) physical |= ButtonX;
         if (logicalKeys & LogicalY) physical |= ButtonY;
-        if (logicalKeys & LogicalStart) physical |= ButtonStart;
-        if (logicalKeys & LogicalSelect) physical |= ButtonSelect;
+
+        if (logicalKeys & LogicalStickL) physical |= ButtonStickL;
+        if (logicalKeys & LogicalStickR) physical |= ButtonStickR;
+
         if (logicalKeys & LogicalL) physical |= ButtonL;
         if (logicalKeys & LogicalR) physical |= ButtonR;
+        if (logicalKeys & LogicalZL) physical |= ButtonZL;
+        if (logicalKeys & LogicalZR) physical |= ButtonZR;
+
+        if (logicalKeys & LogicalStart) physical |= ButtonStart;
+        if (logicalKeys & LogicalSelect) physical |= ButtonSelect;
+        
         if (logicalKeys & LogicalUp) physical |= ButtonUp;
         if (logicalKeys & LogicalDown) physical |= ButtonDown;
         if (logicalKeys & LogicalLeft) physical |= ButtonLeft;
         if (logicalKeys & LogicalRight) physical |= ButtonRight;
+
+        if (logicalKeys & LogicalStickLLeft) physical |= ButtonStickLLeft;
+        if (logicalKeys & LogicalStickLUp) physical |= ButtonStickLUp;
+        if (logicalKeys & LogicalStickLRight) physical |= ButtonStickLRight;
+        if (logicalKeys & LogicalStickLDown) physical |= ButtonStickLDown;
+
+        if (logicalKeys & LogicalStickRLeft) physical |= ButtonStickRLeft;
+        if (logicalKeys & LogicalStickRUp) physical |= ButtonStickRUp;
+        if (logicalKeys & LogicalStickRRight) physical |= ButtonStickRRight;
+        if (logicalKeys & LogicalStickRDown) physical |= ButtonStickRDown;
+
+        if (logicalKeys & LogicalLeftSL) physical |= ButtonLeftSL;
+        if (logicalKeys & LogicalLeftSR) physical |= ButtonLeftSR;
+
+        if (logicalKeys & LogicalRightSL) physical |= ButtonRightSL;
+        if (logicalKeys & LogicalRightSR) physical |= ButtonRightSR;
+
         return physical;
     }
 }
