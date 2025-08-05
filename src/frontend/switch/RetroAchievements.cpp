@@ -11,6 +11,7 @@
 #include "PlatformConfig.h"
 #include "ROMMetaDatabase.h"
 #include "NotificationSystem.h"
+#include "TriggerNotification.h"
 #include "NDS.h"
 #include "RATracker.h"
 #include "version.h"
@@ -282,7 +283,9 @@ static void challenge_indicator_show(const rc_client_achievement_t* achievement)
   {
     int textureId = DownloadAndPackAvatar(url, &width, &height);
     if (textureId >= 0) {
-      g_notification.ShowWithIcon(textureId, width, height, "%d", achievement->id, achievement->title);
+      if (achievement->state == RC_CLIENT_ACHIEVEMENT_STATE_ACTIVE) {
+        g_triggerNotifications.UpdateState(achievement->id, textureId, width, height, true);
+      }
     } else {
       g_notification.Show("%d", achievement->id);
     }
@@ -305,7 +308,7 @@ static void progress_indicator_update(const rc_client_achievement_t* achievement
   {
     int textureId = DownloadAndPackAvatar(url, &width, &height);
     if (textureId >= 0) {
-      g_notification.ShowWithIcon(textureId, width, height, "%s", achievement->measured_progress);
+      g_notification.ShowWithIcon(textureId, width, height, "%f", achievement->measured_percent);
     } else {
       g_notification.Show("%s", achievement->measured_progress);
     }
@@ -402,7 +405,7 @@ static void event_handler(const rc_client_event_t* event, rc_client_t* client)
     case RC_CLIENT_EVENT_ACHIEVEMENT_CHALLENGE_INDICATOR_HIDE:
       challenge_indicator_hide(event->achievement);
       break;
-      case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_SHOW:
+    case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_SHOW:
       progress_indicator_show(event->achievement);
       break;
     case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_UPDATE:

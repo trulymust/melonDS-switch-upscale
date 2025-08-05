@@ -35,6 +35,7 @@
 
 #include "RetroAchievements.h"
 #include "NotificationSystem.h"
+#include "TriggerNotification.h"
 #include "RATracker.h"
 #include "InputConfig.h"
 
@@ -887,6 +888,13 @@ void SetPause(bool pause)
     assert(State == (pause ? emuState_Running : emuState_Paused));
     State = pause ? emuState_Paused : emuState_Running;
     StateAtomic = State;
+    
+    if (pause) {
+        g_triggerNotifications.DeactivateAll();
+    }
+    else {
+        g_triggerNotifications.ReactivateBasedOnState();
+    }
 }
 
 void Stop()
@@ -1094,7 +1102,10 @@ int main(int argc, const char* argv[])
             KeyExplanation::Reset();
 
         BoxGui::Update(rootFrame, rawKeysDown, rawKeysUp);
+
         g_notification.Render();
+        g_triggerNotifications.RenderAll();
+        
         for (auto& [id, tracker] : g_leaderboardTrackers) {
             tracker.Render();
         }

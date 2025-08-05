@@ -19,6 +19,7 @@ SET(SOURCES_SWITCH
     RetroAchievements.cpp
     NotificationSystem.cpp
     InputConfig.cpp
+    TriggerNotification.cpp
     RATracker.cpp
     ../Util_ROM.cpp
     ../Util_Audio.cpp
