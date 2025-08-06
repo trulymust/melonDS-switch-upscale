@@ -307,7 +307,7 @@ static void progress_indicator_update(const rc_client_achievement_t* achievement
   {
     int textureId = DownloadAndPackAvatar(url, &width, &height);
     if (textureId >= 0) {
-      g_notification.ShowWithIcon(textureId, width, height, "%f", achievement->measured_percent);
+      g_notification.ShowWithIcon(textureId, width, height, "%s\n%f%", achievement->title, achievement->measured_percent);
     } else {
       g_notification.Show("%s", achievement->measured_progress);
     }

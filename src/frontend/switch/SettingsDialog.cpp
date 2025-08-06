@@ -564,7 +564,6 @@ const char* GetButtonName(u32 key)
     }
 }
 
-
 void ShowImage(BoxGui::Frame& parent, BoxGui::Skewer& skewer, int textureId, int nwidth, int nheight, float imageSize = 64.f)
 {
     if (textureId < 0 || nwidth <= 0 || nheight <= 0)
@@ -724,6 +723,7 @@ void DoGui(BoxGui::Frame& parent)
         if (!pad_initialized) {
             padConfigureInput(1, HidNpadStyleSet_NpadStandard);
             padInitializeAny(&pad);
+            InputConfig::loadMappingFromFile("sdmc:/switch/melonDS/input.cfg");
             pad_initialized = true;
         }
 
