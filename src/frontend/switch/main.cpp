@@ -893,7 +893,7 @@ void SetPause(bool pause)
         g_triggerNotifications.DeactivateAll();
     }
     else {
-        g_triggerNotifications.ReactivateBasedOnState();
+        g_triggerNotifications.ReactiveAll();
     }
 }
 

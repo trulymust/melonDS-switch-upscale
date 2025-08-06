@@ -48,24 +48,10 @@ public:
         }
     }
 
-    void ReactivateBasedOnState() {
-        for (auto& notif : notifications) {
-            auto it = conditionStates.find(notif.id);
-            if (it != conditionStates.end()) {
-                notif.active = it->second;
-            }
-        }
-    }
-
     void RenderAll() {
         const float iconSize = 40.f;
         const float spacing = 10.f;
         Gfx::Vector2f startPos;
-
-        notifications.erase(
-            std::remove_if(notifications.begin(), notifications.end(), [](const TriggerNotification& n) { return !n.active; }),
-            notifications.end()
-        );
 
         switch (Config::GlobalRotation) {
             case 1: startPos = {20.f, 20.f}; break;
@@ -98,6 +84,12 @@ public:
     void DeactivateAll() {
         for (auto& notif : notifications) {
             notif.active = false;
+        }
+    }
+
+    void ReactiveAll() {
+        for (auto& notif : notifications) {
+            notif.active = true;
         }
     }
 };
