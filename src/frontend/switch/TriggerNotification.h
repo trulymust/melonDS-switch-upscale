@@ -83,6 +83,13 @@ public:
         }
     }
 
+    void RemoveNotificationById(int id) {
+        notifications.erase(
+            std::remove_if(notifications.begin(), notifications.end(), [id](const TriggerNotification& n) { return n.id == id; }),
+            notifications.end());
+    }
+
+
     void ClearAll() {
         notifications.clear();
         conditionStates.clear();

@@ -294,8 +294,7 @@ static void challenge_indicator_show(const rc_client_achievement_t* achievement)
 
 static void challenge_indicator_hide(const rc_client_achievement_t* achievement)
 {
-  // This indicator is no longer needed
-  // TODO: destroy_challenge_indicator(achievement->id);
+  g_triggerNotifications.RemoveNotificationById(achievement->id);
 }
 
 // The UPDATE event assumes the indicator is already visible, and just asks us to update the image/text.
