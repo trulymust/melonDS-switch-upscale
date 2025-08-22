@@ -1,4 +1,4 @@
 // version.h
 #pragma once
 
-#define PROJECT_VERSION "7.2"
+#define PROJECT_VERSION "8"
