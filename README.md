@@ -1,4 +1,6 @@
-<p align="center"><img src="https://raw.githubusercontent.com/melonDS-emu/melonDS/master/res/icon/melon_128x128.png"></p>
+
+<img width="2500" height="1000" alt="banner" src="https://github.com/user-attachments/assets/bb31595c-5452-453e-8d30-0144d172b1af" />
+
 <h2 align="center"><b>melonDS</b></h2>
 <p align="center">
 <a href="http://melonds.kuribo64.net/" alt="melonDS website"><img src="https://img.shields.io/badge/website-melonds.kuribo64.net-%2331352e.svg"></a>
@@ -112,7 +114,8 @@ You can also use the build script (build_script.sh) to build the .nro file after
 
  * Martin for GBAtek, a good piece of documentation
  * Cydrak for the extra 3D GPU research
- * limittox for the icon
+ * limittox for the icon (old)
+ * daedra000 for the NX icons and banner
  * All of you comrades who have been testing melonDS, reporting issues, suggesting shit, etc
 
 ## License
