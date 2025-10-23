@@ -31,7 +31,6 @@ static bool g_login_successful = false;
 bool g_loadAchievements = true;
 std::vector<Achievement> g_achievements;
 const char* client = "Gheovgos-melonDS/" PROJECT_VERSION " (Switch NX)";
-bool hardcore = false;
 
 /* -------------- SERVER COMUNICATION --------------*/
 
@@ -307,7 +306,7 @@ static void progress_indicator_update(const rc_client_achievement_t* achievement
   {
     int textureId = DownloadAndPackAvatar(url, &width, &height);
     if (textureId >= 0) {
-      g_notification.ShowWithIcon(textureId, width, height, "%s\n%f%", achievement->title, achievement->measured_percent);
+      g_notification.ShowWithIcon(textureId, width, height, "%s\n%s", achievement->title, achievement->measured_progress);
     } else {
       g_notification.Show("%s", achievement->measured_progress);
     }
@@ -324,7 +323,8 @@ static void progress_indicator_show(const rc_client_achievement_t* achievement)
 static void progress_indicator_hide(void)
 {
   // The HIDE event indicates the indicator should no longer be visible.
-  // TODO: hide_progress_indicator();
+  // g_notification.DestroyNotifiation();
+  
 }
 
 static void game_mastered(void)
@@ -338,7 +338,7 @@ static void game_mastered(void)
   if (rc_client_game_get_image_url(game, url, sizeof(url)) == RC_OK)
   {
     int textureId = DownloadAndPackAvatar(url, &width, &height);
-    if (hardcore)
+    if (Config::hardcoreMode == 1)
       g_notification.ShowWithIcon(textureId, width, height, "Mastered %s\n%s", game->title, rc_client_get_user_info(g_client)->display_name);
     else
       g_notification.ShowWithIcon(textureId, width, height, "Completed %s\n%s", game->title, rc_client_get_user_info(g_client)->display_name);
@@ -501,7 +501,7 @@ void initialize_retroachievements_client(void)
 
   rc_client_set_event_handler(g_client, event_handler);
 
-  if (hardcore)
+  if (Config::hardcoreMode == 1)
     rc_client_set_hardcore_enabled(g_client, 1);
   else 
     rc_client_set_hardcore_enabled(g_client, 0);
@@ -542,8 +542,14 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
 
   if (user->avatar_url) {
     avatarTexture = DownloadAndPackAvatar(user->avatar_url,  &texWidth, &texHeight);
+    printf("Hardcore: %d\n", Config::hardcoreMode);
+    fflush(stdout);
 
-    g_notification.ShowWithIcon(avatarTexture, texWidth, texHeight, "Welcome %s (%u points)", user->display_name, user->score);
+    if(Config::hardcoreMode == 1)
+      g_notification.ShowWithIcon(avatarTexture, texWidth, texHeight, "Welcome %s (%u points)\nHardcore mode enabled", user->display_name, user->score);
+    else
+      g_notification.ShowWithIcon(avatarTexture, texWidth, texHeight, "Welcome %s (%u points)\nHardcore NOT enabled", user->display_name, user->score);
+
     return;
   }
   g_notification.Show("Welcome %s (%u points)", user->display_name, user->score);
