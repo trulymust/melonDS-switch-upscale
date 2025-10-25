@@ -774,6 +774,8 @@ void DoGui(BoxGui::Frame& parent)
             DoInputButton(settingsFrame, settingsSkewer, "Left SR ", InputConfig::ButtonLeftSR);
             DoInputButton(settingsFrame, settingsSkewer, "Right SL: ", InputConfig::ButtonRightSL);
             DoInputButton(settingsFrame, settingsSkewer, "Right SR: ", InputConfig::ButtonRightSR);
+
+            SectionHeader(settingsFrame, settingsSkewer, "Hotkeys Remapping");
             
             DoCheckbox(settingsFrame, settingsSkewer, "Reset to default", defaultMapping);
             DoCheckbox(settingsFrame, settingsSkewer, "Save this configuration", saveMapping);

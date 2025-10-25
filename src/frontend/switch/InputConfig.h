@@ -34,6 +34,10 @@ namespace InputConfig {
     inline u64 ButtonRightSL = HidNpadButton_RightSL;
     inline u64 ButtonRightSR = HidNpadButton_RightSR;
 
+    // Hotkeys Buttons Combination
+
+    inline u64 Pause = (HidNpadButton_ZL|HidNpadButton_ZR);
+
 
     inline void ResetToDefault() {
         ButtonA = HidNpadButton_A;
