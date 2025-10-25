@@ -542,8 +542,6 @@ static void login_callback(int result, const char* error_message, rc_client_t* c
 
   if (user->avatar_url) {
     avatarTexture = DownloadAndPackAvatar(user->avatar_url,  &texWidth, &texHeight);
-    printf("Hardcore: %d\n", Config::hardcoreMode);
-    fflush(stdout);
 
     if(Config::hardcoreMode == 1)
       g_notification.ShowWithIcon(avatarTexture, texWidth, texHeight, "Welcome %s (%u points)\nHardcore mode enabled", user->display_name, user->score);

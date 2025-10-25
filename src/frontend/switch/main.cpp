@@ -1036,6 +1036,15 @@ int main(int argc, const char* argv[])
     Emulation::Init();
 
     bool argvLoaded = false;
+    static bool pad_initialized = false;
+    static PadState pad;
+
+    if (!pad_initialized) {
+            padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+            padInitializeAny(&pad);
+            InputConfig::loadMappingFromFile("sdmc:/switch/melonDS/input.cfg");
+            pad_initialized = true;
+        }
 
     if (Config::RetroAchievementsUsername[0] != '\0')
         InitRetroAchievements(Config::RetroAchievementsUsername, Config::RetroAchievementsToken, true);

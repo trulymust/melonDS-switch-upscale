@@ -22,7 +22,6 @@ namespace {
 }
 
 static PadState pad;
-static bool pad_initialized = false;
 
 namespace SettingsDialog
 {
@@ -719,13 +718,6 @@ void DoGui(BoxGui::Frame& parent)
         break;
     case uiScreen_InputSettings:
         title = "Input settings";
-
-        if (!pad_initialized) {
-            padConfigureInput(1, HidNpadStyleSet_NpadStandard);
-            padInitializeAny(&pad);
-            InputConfig::loadMappingFromFile("sdmc:/switch/melonDS/input.cfg");
-            pad_initialized = true;
-        }
 
         padUpdate(&pad);
         {
