@@ -15,3 +15,4 @@ cmake-build-debug
 
 .DS_Store
 .vscode/settings.json
+build_script.sh
