@@ -605,8 +605,8 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
             for (int i = 0; i < 12; i++)
                 keyMask &= ~(!!(PlatformKeysHeld & rotatedKeyMappings[i]) << i);
 
-            bool feedMicNoise = PlatformKeysHeld & HidNpadButton_StickL;
-            if (keysDown & HidNpadButton_StickR)
+            bool feedMicNoise = PlatformKeysHeld & InputConfig::MicNoise;
+            if (keysDown & InputConfig::changeScreen)
             {
                 switch (Config::ScreenSizing)
                 {

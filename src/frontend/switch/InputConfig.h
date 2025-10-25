@@ -37,6 +37,8 @@ namespace InputConfig {
     // Hotkeys Buttons Combination
 
     inline u64 Pause = (HidNpadButton_ZL|HidNpadButton_ZR);
+    inline u64 MicNoise = HidNpadButton_StickL;
+    inline u64 changeScreen = HidNpadButton_StickR;
 
 
     inline void ResetToDefault() {

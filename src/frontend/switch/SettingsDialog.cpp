@@ -776,6 +776,10 @@ void DoGui(BoxGui::Frame& parent)
             DoInputButton(settingsFrame, settingsSkewer, "Right SR: ", InputConfig::ButtonRightSR);
 
             SectionHeader(settingsFrame, settingsSkewer, "Hotkeys Remapping");
+
+            DoInputButton(settingsFrame, settingsSkewer, "Pause ", InputConfig::Pause);
+            DoInputButton(settingsFrame, settingsSkewer, "Simulate Mic Noise: ", InputConfig::MicNoise);
+            DoInputButton(settingsFrame, settingsSkewer, "Change Main Screen: ", InputConfig::changeScreen);
             
             DoCheckbox(settingsFrame, settingsSkewer, "Reset to default", defaultMapping);
             DoCheckbox(settingsFrame, settingsSkewer, "Save this configuration", saveMapping);
