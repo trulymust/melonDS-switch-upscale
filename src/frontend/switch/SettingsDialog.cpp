@@ -520,49 +520,6 @@ void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
     }
 }
 
-const char* GetButtonName(u32 key)
-{
-    switch (key) {
-        case HidNpadButton_A: return "A";
-        case HidNpadButton_B: return "B";
-        case HidNpadButton_X: return "X";
-        case HidNpadButton_Y: return "Y";
-
-        case HidNpadButton_StickL: return "L Stick Button";
-        case HidNpadButton_StickR: return "R Stick Button";
-
-        case HidNpadButton_L: return "L";
-        case HidNpadButton_R: return "R";
-        case HidNpadButton_ZL: return "ZL";
-        case HidNpadButton_ZR: return "ZR";
-
-        case HidNpadButton_Plus: return "+";
-        case HidNpadButton_Minus: return "-";
-
-        case HidNpadButton_Up: return "D-Pad UP";
-        case HidNpadButton_Down: return "D-Pad Down";
-        case HidNpadButton_Right: return "D-Pad Right";
-        case HidNpadButton_Left: return "D-Pad Left";
-
-        case HidNpadButton_StickLLeft: return "L Stick Left";
-        case HidNpadButton_StickLUp: return "L Stick Up";
-        case HidNpadButton_StickLRight: return "L Stick Right";
-        case HidNpadButton_StickLDown: return "L Stick Down";
-
-        case HidNpadButton_StickRLeft: return "R Stick Left";
-        case HidNpadButton_StickRUp: return "R Stick Up";
-        case HidNpadButton_StickRRight: return "R Stick Right";
-        case HidNpadButton_StickRDown: return "R Stick Down";
-
-        case HidNpadButton_LeftSL: return "Left SL";
-        case HidNpadButton_LeftSR: return "Left SR";
-        case HidNpadButton_RightSL: return "Right SL";
-        case HidNpadButton_RightSR: return "Right SR";
-
-        default: return "•͡˘㇁•͡˘";
-    }
-}
-
 void ShowImage(BoxGui::Frame& parent, BoxGui::Skewer& skewer, int textureId, int nwidth, int nheight, float imageSize = 64.f)
 {
     if (textureId < 0 || nwidth <= 0 || nheight <= 0)
