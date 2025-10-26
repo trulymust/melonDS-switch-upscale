@@ -364,49 +364,160 @@ void DoLabel(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* text, bo
     }
 }
 
-const char* ButtonToString(u32 button)
+const char* ButtonToString(u64 buttons)
 {
-    switch (button)
-    {
-        case HidNpadButton_A: return "A";
-        case HidNpadButton_B: return "B";
-        case HidNpadButton_X: return "X";
-        case HidNpadButton_Y: return "Y";
+    static std::string result;
+    result.clear();
+    bool first = true;
 
-        case HidNpadButton_StickL: return "L Stick Button";
-        case HidNpadButton_StickR: return "R Stick Button";
-
-        case HidNpadButton_L: return "L";
-        case HidNpadButton_R: return "R";
-        case HidNpadButton_ZL: return "ZL";
-        case HidNpadButton_ZR: return "ZR";
-
-        case HidNpadButton_Plus: return "+";
-        case HidNpadButton_Minus: return "-";
-
-        case HidNpadButton_Up: return "D-Pad UP";
-        case HidNpadButton_Down: return "D-Pad Down";
-        case HidNpadButton_Right: return "D-Pad Right";
-        case HidNpadButton_Left: return "D-Pad Left";
-
-        case HidNpadButton_StickLLeft: return "L Stick Left";
-        case HidNpadButton_StickLUp: return "L Stick Up";
-        case HidNpadButton_StickLRight: return "L Stick Right";
-        case HidNpadButton_StickLDown: return "L Stick Down";
-
-        case HidNpadButton_StickRLeft: return "R Stick Left";
-        case HidNpadButton_StickRUp: return "R Stick Up";
-        case HidNpadButton_StickRRight: return "R Stick Right";
-        case HidNpadButton_StickRDown: return "R Stick Down";
-
-        case HidNpadButton_LeftSL: return "Left SL";
-        case HidNpadButton_LeftSR: return "Left SR";
-        case HidNpadButton_RightSL: return "Right SL";
-        case HidNpadButton_RightSR: return "Right SR";
-
-        default: return "•͡˘㇁•͡˘";
+    if (buttons & HidNpadButton_A) {
+        if (!first) result += " + ";
+        result += "A";
+        first = false;
     }
+    if (buttons & HidNpadButton_B) {
+        if (!first) result += " + ";
+        result += "B";
+        first = false;
+    }
+    if (buttons & HidNpadButton_X) {
+        if (!first) result += " + ";
+        result += "X";
+        first = false;
+    }
+    if (buttons & HidNpadButton_Y) {
+        if (!first) result += " + ";
+        result += "Y";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickL) {
+        if (!first) result += " + ";
+        result += "L Stick Button";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickR) {
+        if (!first) result += " + ";
+        result += "R Stick Button";
+        first = false;
+    }
+    if (buttons & HidNpadButton_L) {
+        if (!first) result += " + ";
+        result += "L";
+        first = false;
+    }
+    if (buttons & HidNpadButton_R) {
+        if (!first) result += " + ";
+        result += "R";
+        first = false;
+    }
+    if (buttons & HidNpadButton_ZL) {
+        if (!first) result += " + ";
+        result += "ZL";
+        first = false;
+    }
+    if (buttons & HidNpadButton_ZR) {
+        if (!first) result += " + ";
+        result += "ZR";
+        first = false;
+    }
+    if (buttons & HidNpadButton_Plus) {
+        if (!first) result += " + ";
+        result += "+";
+        first = false;
+    }
+    if (buttons & HidNpadButton_Minus) {
+        if (!first) result += " + ";
+        result += "-";
+        first = false;
+    }
+    if (buttons & HidNpadButton_Up) {
+        if (!first) result += " + ";
+        result += "D-Pad UP";
+        first = false;
+    }
+    if (buttons & HidNpadButton_Down) {
+        if (!first) result += " + ";
+        result += "D-Pad Down";
+        first = false;
+    }
+    if (buttons & HidNpadButton_Right) {
+        if (!first) result += " + ";
+        result += "D-Pad Right";
+        first = false;
+    }
+    if (buttons & HidNpadButton_Left) {
+        if (!first) result += " + ";
+        result += "D-Pad Left";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickLLeft) {
+        if (!first) result += " + ";
+        result += "L Stick Left";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickLUp) {
+        if (!first) result += " + ";
+        result += "L Stick Up";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickLRight) {
+        if (!first) result += " + ";
+        result += "L Stick Right";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickLDown) {
+        if (!first) result += " + ";
+        result += "L Stick Down";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickRLeft) {
+        if (!first) result += " + ";
+        result += "R Stick Left";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickRUp) {
+        if (!first) result += " + ";
+        result += "R Stick Up";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickRRight) {
+        if (!first) result += " + ";
+        result += "R Stick Right";
+        first = false;
+    }
+    if (buttons & HidNpadButton_StickRDown) {
+        if (!first) result += " + ";
+        result += "R Stick Down";
+        first = false;
+    }
+    if (buttons & HidNpadButton_LeftSL) {
+        if (!first) result += " + ";
+        result += "Left SL";
+        first = false;
+    }
+    if (buttons & HidNpadButton_LeftSR) {
+        if (!first) result += " + ";
+        result += "Left SR";
+        first = false;
+    }
+    if (buttons & HidNpadButton_RightSL) {
+        if (!first) result += " + ";
+        result += "Right SL";
+        first = false;
+    }
+    if (buttons & HidNpadButton_RightSR) {
+        if (!first) result += " + ";
+        result += "Right SR";
+        first = false;
+    }
+
+    if (result.empty()) {
+        return "•͡˘㇁•͡˘";
+    }
+
+    return result.c_str();
 }
+
 
 void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name, u64& mappedKey, bool first = false)
 {
@@ -461,19 +572,10 @@ void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
                     }
                     padUpdate(&pad);
                     u64 keys = padGetButtonsDown(&pad);
-                    if (keys != 0)
-                    {
-                        for (u32 i = 0; i < 64; ++i)
-                        {
-                            u64 buttonMask = (1ULL << i);
-                            if (keys & buttonMask)
-                            {
-                                MappedKey = static_cast<u32>(buttonMask);
-                                inputCaptured = true;
-                                EndTimestamp = Gfx::AnimationTimestamp;
-                                break;
-                            }
-                        }
+                    if (keys != 0) {
+                        MappedKey = keys;
+                        inputCaptured = true;
+                        EndTimestamp = Gfx::AnimationTimestamp;
                     }
                 }
 
