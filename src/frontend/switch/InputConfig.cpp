@@ -143,6 +143,11 @@ namespace InputConfig {
         fprintf(f, "ButtonRightSL=%llu\n", ButtonRightSL);
         fprintf(f, "ButtonRightSR=%llu\n", ButtonRightSR);
 
+        fprintf(f, "Pause=%llu\n", Pause);
+        fprintf(f, "MicNoise=%llu\n", MicNoise);
+        fprintf(f, "changeScreen=%llu\n", changeScreen);
+        fprintf(f, "fastForward=%llu\n", fastForward);
+
         fclose(f);
     }
 
@@ -182,6 +187,11 @@ namespace InputConfig {
             else if (strcmp(key, "ButtonLeftSR") == 0) ButtonLeftSR = value;
             else if (strcmp(key, "ButtonRightSL") == 0) ButtonRightSL = value;
             else if (strcmp(key, "ButtonRightSR") == 0) ButtonRightSR = value;
+
+            else if (strcmp(key, "Pause") == 0) Pause = value;
+            else if (strcmp(key, "MicNoise") == 0) MicNoise = value;
+            else if (strcmp(key, "changeScreen") == 0) changeScreen = value;
+            else if (strcmp(key, "fastForward") == 0) fastForward = value;
         }
 
         fclose(f);

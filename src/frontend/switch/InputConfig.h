@@ -71,6 +71,10 @@ namespace InputConfig {
         ButtonLeftSR = HidNpadButton_LeftSR;
         ButtonRightSL = HidNpadButton_RightSL;
         ButtonRightSR = HidNpadButton_RightSR;
+        Pause = (HidNpadButton_ZL|HidNpadButton_ZR);
+        MicNoise = HidNpadButton_StickL;
+        changeScreen = HidNpadButton_StickR;
+        fastForward = HidNpadButton_ZR;
     }
 
 
