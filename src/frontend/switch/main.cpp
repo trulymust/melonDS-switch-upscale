@@ -701,7 +701,7 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
             static bool fastForwardToggle = false;
             static bool prevKeyPressed = false;
 
-            bool currentKeyPressed = Config::TouchscreenMode < 2 && (PlatformKeysHeld & (Config::LeftHandedMode ? HidNpadButton_ZR : HidNpadButton_ZL));
+            bool currentKeyPressed = Config::TouchscreenMode < 2 && (PlatformKeysHeld & InputConfig::fastForward);
 
             if (Config::FastForward) {
                 // "Hold"

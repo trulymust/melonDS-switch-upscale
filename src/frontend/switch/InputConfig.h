@@ -39,6 +39,7 @@ namespace InputConfig {
     inline u64 Pause = (HidNpadButton_ZL|HidNpadButton_ZR);
     inline u64 MicNoise = HidNpadButton_StickL;
     inline u64 changeScreen = HidNpadButton_StickR;
+    inline u64 fastForward= HidNpadButton_ZR;
 
 
     inline void ResetToDefault() {
