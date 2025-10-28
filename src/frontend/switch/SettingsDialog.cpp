@@ -421,7 +421,7 @@ const char* ButtonToString(u64 buttons)
         first = false;
     }
     if (buttons & HidNpadButton_Plus) {
-        if (!first) result += " + ";
+        if (!first) result += " AND ";
         result += "+";
         first = false;
     }

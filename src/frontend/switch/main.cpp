@@ -376,17 +376,6 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
     if (State == emuState_Running)
     {
         padUpdate(&Pad);
-        u64 rawKeysDown = padGetButtonsDown(&Pad);
-        u64 rawKeysUp = padGetButtonsUp(&Pad);
-
-        u64 logicalKeysDown = InputConfig::GetLogicalKeysDown(rawKeysDown);
-        u64 logicalKeysUp = InputConfig::GetLogicalKeysDown(rawKeysUp);
-
-        for (const auto& [logicalKey, action] : InputConfig::actionMap)
-        {
-            if (logicalKeysDown & logicalKey)
-                action();
-        }
 
         PlatformKeysHeld |= keysDown;
         PlatformKeysHeld &= ~keysUp;
@@ -1067,15 +1056,6 @@ int main(int argc, const char* argv[])
 
         u64 logicalKeysDown = InputConfig::GetLogicalKeysDown(rawKeysDown);
         u64 logicalKeysUp = InputConfig::GetLogicalKeysDown(rawKeysUp);
-
-        for (const auto& [logicalKey, action] : InputConfig::actionMap)
-        {
-            if (logicalKeysDown & logicalKey)
-                action();
-        }
-
-        u64 remappedKeysDown = InputConfig::getPhysicalKeysFromLogical(logicalKeysDown);
-        u64 remappedKeysUp = InputConfig::getPhysicalKeysFromLogical(logicalKeysUp);
 
         if (Emulation::State != Emulation::emuState_Nothing)
         {
