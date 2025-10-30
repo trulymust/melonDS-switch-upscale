@@ -40,6 +40,8 @@ namespace InputConfig {
     inline u64 MicNoise = HidNpadButton_StickL;
     inline u64 changeScreen = HidNpadButton_StickR;
     inline u64 fastForward= HidNpadButton_ZR;
+    inline u64 QuickSave= (HidNpadButton_ZL|HidNpadButton_L);
+    inline u64 QuickLoad= (HidNpadButton_ZR|HidNpadButton_R);
 
 
     inline void ResetToDefault() {
@@ -75,6 +77,8 @@ namespace InputConfig {
         MicNoise = HidNpadButton_StickL;
         changeScreen = HidNpadButton_StickR;
         fastForward = HidNpadButton_ZR;
+        QuickSave= (HidNpadButton_ZL|HidNpadButton_L);
+        QuickLoad= (HidNpadButton_ZR|HidNpadButton_R);
     }
 
 

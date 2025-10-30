@@ -386,6 +386,30 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
         {
             SetPause(true);
         }
+        else if((PlatformKeysHeld & InputConfig::QuickSave) == InputConfig::QuickSave)
+        {
+            //g_notification.Show("quicksaving...");
+            //g_notification.Render();
+            char filename[512];
+            Frontend::GetSavestateName(0, filename, 512);
+            strcpy(filename + strlen(filename) - 3, "mem"); // replace the extension with "mem" to load from memory (faster)
+            if (Frontend::SaveState(filename))
+                g_notification.Show("quicksave... ok");
+            else
+                g_notification.Show("quicksave... error");
+        }
+        else if((PlatformKeysHeld & InputConfig::QuickLoad) == InputConfig::QuickLoad)
+        {
+            //g_notification.Show("quickloading..");
+            //g_notification.Render();
+            char filename[512];
+            Frontend::GetSavestateName(0, filename, 512);
+            strcpy(filename + strlen(filename) - 3, "mem"); // replace the extension with "mem" to load from memory (faster)
+            if (Frontend::LoadState(filename))
+                g_notification.Show("quickload... ok");
+            else
+                g_notification.Show("quickload... error");
+        }
         else
         {
             u32 rotatedKeyMappings[12];
@@ -849,6 +873,9 @@ void LoadROM(const char* file)
     }
 
     load_game_from_file(file);
+    
+    // TODO: add a setting to toggle on/off
+    Frontend::EnableCheats(true);
 }
 
 void LoadBIOS()

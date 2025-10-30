@@ -730,10 +730,13 @@ bool LoadState(const char* filename)
 {
     u32 oldGBACartCRC = GBACart::CartCRC;
 
-    // backup
-    Savestate* backup = new Savestate("timewarp.mln", true);
-    NDS::DoSavestate(backup);
-    delete backup;
+    if (strncmp(filename + strlen(filename) - 3, "mem", 3) != 0) // Check if the filename ends with "mem"
+    {
+        // backup
+        Savestate* backup = new Savestate("timewarp.mln", true);
+        NDS::DoSavestate(backup);
+        delete backup;
+    }
 
     bool failed = false;
 
@@ -745,8 +748,9 @@ bool LoadState(const char* filename)
         //uiMsgBoxError(MainWindow, "Error", "Could not load savestate file.");
 
         // current state might be crapoed, so restore from sane backup
-        state = new Savestate("timewarp.mln", false);
+        //state = new Savestate("timewarp.mln", false);
         failed = true;
+        return !failed;
     }
 
     NDS::DoSavestate(state);

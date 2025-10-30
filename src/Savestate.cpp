@@ -17,6 +17,7 @@
 */
 
 #include <stdio.h>
+#include <cstring>
 #include "Savestate.h"
 #include "Platform.h"
 
@@ -43,6 +44,11 @@
     * different minor means adjustments may have to be made
 */
 
+
+const u32 QUICKSAVE_DEFAULT_SIZE = 32 * 1024 * 1024; // 32 MB
+int quicksave_buf[QUICKSAVE_DEFAULT_SIZE] = {0};  // static memory buffer
+
+
 Savestate::Savestate(const char* filename, bool save)
 {
     const char* magic = "MELN";
@@ -52,7 +58,12 @@ Savestate::Savestate(const char* filename, bool save)
     if (save)
     {
         Saving = true;
-        file = Platform::OpenLocalFile(filename, "wb");
+
+        if (strncmp(filename + strlen(filename) - 3, "mem", 3) == 0) // Check if the filename ends with "mem"
+            file = fmemopen(quicksave_buf, QUICKSAVE_DEFAULT_SIZE, "wb");
+        else
+            file = Platform::OpenLocalFile(filename, "wb");
+        
         if (!file)
         {
             printf("savestate: file %s doesn't exist\n", filename);
@@ -71,7 +82,12 @@ Savestate::Savestate(const char* filename, bool save)
     else
     {
         Saving = false;
-        file = Platform::OpenFile(filename, "rb");
+        
+        if (strncmp(filename + strlen(filename) - 3, "mem", 3) == 0) // Check if the filename ends with "mem"
+            file = fmemopen(quicksave_buf, QUICKSAVE_DEFAULT_SIZE, "rb");
+        else
+            file = Platform::OpenFile(filename, "rb");
+            
         if (!file)
         {
             printf("savestate: file %s doesn't exist\n", filename);
@@ -115,12 +131,13 @@ Savestate::Savestate(const char* filename, bool save)
 
         buf = 0;
         fread(&buf, 4, 1, file);
+        /*
         if (buf != len)
         {
             printf("savestate: bad length %d\n", buf);
             Error = true;
             return;
-        }
+        }*/
 
         fseek(file, 4, SEEK_CUR);
     }
