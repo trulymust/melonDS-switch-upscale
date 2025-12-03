@@ -840,6 +840,8 @@ void DoGui(BoxGui::Frame& parent)
             DoInputButton(settingsFrame, settingsSkewer, "Simulate Mic Noise: ", InputConfig::MicNoise);
             DoInputButton(settingsFrame, settingsSkewer, "Change Main Screen: ", InputConfig::changeScreen);
             DoInputButton(settingsFrame, settingsSkewer, "FastForward: ", InputConfig::fastForward);
+            DoInputButton(settingsFrame, settingsSkewer, "QuickSave: ", InputConfig::QuickSave);
+            DoInputButton(settingsFrame, settingsSkewer, "QuickLoad: ", InputConfig::QuickLoad);
             
             DoCheckbox(settingsFrame, settingsSkewer, "Reset to default", defaultMapping);
             DoCheckbox(settingsFrame, settingsSkewer, "Save this configuration", saveMapping);

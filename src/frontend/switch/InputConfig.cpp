@@ -147,6 +147,8 @@ namespace InputConfig {
         fprintf(f, "MicNoise=%llu\n", MicNoise);
         fprintf(f, "changeScreen=%llu\n", changeScreen);
         fprintf(f, "fastForward=%llu\n", fastForward);
+        fprintf(f, "QuickSave=%llu\n", QuickSave);
+        fprintf(f, "QuickLoad=%llu\n", QuickLoad);
 
         fclose(f);
     }
@@ -192,6 +194,8 @@ namespace InputConfig {
             else if (strcmp(key, "MicNoise") == 0) MicNoise = value;
             else if (strcmp(key, "changeScreen") == 0) changeScreen = value;
             else if (strcmp(key, "fastForward") == 0) fastForward = value;
+            else if (strcmp(key, "QuickSave") == 0) QuickSave = value;
+            else if (strcmp(key, "QuickLoad") == 0) QuickLoad = value;
         }
 
         fclose(f);
