@@ -16,6 +16,10 @@
 </p>
 DS emulator, sorta
 
+## ABANDONED
+Due to recent changes in my personal life, I am no longer able to work on this project. I apologize for this. I invite anyone to take over the code, as it is open source, and continue and complete the project. Unfortunately, I do not have the time.
+Here the original readme.
+##
 The goal is to do things right and fast, akin to blargSNES (but hopefully better). But also to, you know, have a fun challenge :)
 <hr>
 
