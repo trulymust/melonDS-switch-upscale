@@ -188,7 +188,8 @@ private:
     static const int BinStride = 2048/32;
     static const int CoarseBinStride = BinStride/32;
 
-    static const int MaxWorkTiles = MaxTilesPerLine*MaxTileLines*48;
+    static const int MaxWorkItemsPerTile = 24;
+    static const int MaxWorkTiles = MaxTilesPerLine*MaxTileLines*MaxWorkItemsPerTile;
     static const int MaxVariants = 256;
 
     int RenderScale = 1;

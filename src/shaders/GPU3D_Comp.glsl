@@ -137,7 +137,8 @@ const int MaxTileLines = MaxScreenHeight/TileSize;
 const int BinStride = 2048/32;
 const int CoarseBinStride = BinStride/32;
 
-const int MaxWorkTiles = MaxTilesPerLine*MaxTileLines*48;
+const int MaxWorkItemsPerTile = 24;
+const int MaxWorkTiles = MaxTilesPerLine*MaxTileLines*MaxWorkItemsPerTile;
 const int MaxVariants = 256;
 
 layout (std430, binding = 3)
