@@ -726,15 +726,34 @@ bool SavestateExists(int slot)
     return Platform::FileExists(ssfile);
 }
 
+static bool IsMemorySavestateFilename(const char* filename)
+{
+    size_t len = strlen(filename);
+    return len >= 3 && strncmp(filename + len - 3, "mem", 3) == 0;
+}
+
+static void CaptureRetroAchievementsFooter(Savestate* state)
+{
+    state->Finish();
+    capture_retroachievements_state(state->GetFile());
+}
+
+static void RestoreRetroAchievementsFooter(Savestate* state)
+{
+    if (state->SeekAfterState())
+        restore_retroachievements_state(state->GetFile());
+}
+
 bool LoadState(const char* filename)
 {
     u32 oldGBACartCRC = GBACart::CartCRC;
 
-    if (strncmp(filename + strlen(filename) - 3, "mem", 3) != 0) // Check if the filename ends with "mem"
+    if (!IsMemorySavestateFilename(filename))
     {
         // backup
-        Savestate* backup = new Savestate("timewarp.mln", true);
+        Savestate* backup = new Savestate("timewarp.mem", true);
         NDS::DoSavestate(backup);
+        CaptureRetroAchievementsFooter(backup);
         delete backup;
     }
 
@@ -754,6 +773,7 @@ bool LoadState(const char* filename)
     }
 
     NDS::DoSavestate(state);
+    RestoreRetroAchievementsFooter(state);
     delete state;
 
     if (!failed)
@@ -808,6 +828,7 @@ bool SaveState(const char* filename)
     else
     {
         NDS::DoSavestate(state);
+        CaptureRetroAchievementsFooter(state);
         delete state;
 
         if (Config::SavestateRelocSRAM && ROMPath[ROMSlot_NDS][0]!='\0')
@@ -821,8 +842,6 @@ bool SaveState(const char* filename)
         }
     }
 
-    capture_retroachievements_state(state->GetFile());
-
     return true;
 }
 
@@ -833,9 +852,8 @@ void UndoStateLoad()
     // pray that this works
     // what do we do if it doesn't???
     // but it should work.
-    Savestate* backup = new Savestate("timewarp.mln", false);
+    Savestate* backup = new Savestate("timewarp.mem", false);
     NDS::DoSavestate(backup);
-    delete backup;
 
     if (ROMPath[ROMSlot_NDS][0]!='\0')
     {
@@ -843,7 +861,8 @@ void UndoStateLoad()
         NDS::RelocateSave(SRAMPath[ROMSlot_NDS], false);
     }
 
-    restore_retroachievements_state(backup->GetFile());
+    RestoreRetroAchievementsFooter(backup);
+    delete backup;
 }
 
 int ImportSRAM(const char* filename)

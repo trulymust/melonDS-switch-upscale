@@ -46,23 +46,46 @@
 
 
 const u32 QUICKSAVE_DEFAULT_SIZE = 32 * 1024 * 1024; // 32 MB
-int quicksave_buf[QUICKSAVE_DEFAULT_SIZE] = {0};  // static memory buffer
+const u32 SAVESTATE_FILE_BUFFER_SIZE = 1024 * 1024; // 1 MB
+u8 quicksave_buf[QUICKSAVE_DEFAULT_SIZE] = {0};  // static memory buffer
+
+static bool IsMemorySavestate(const char* filename)
+{
+    size_t len = strlen(filename);
+    return len >= 3 && strncmp(filename + len - 3, "mem", 3) == 0;
+}
+
+void Savestate::SetFileBuffer()
+{
+    if (!file)
+        return;
+
+    FileBuffer = new u8[SAVESTATE_FILE_BUFFER_SIZE];
+    setvbuf(file, (char*)FileBuffer, _IOFBF, SAVESTATE_FILE_BUFFER_SIZE);
+}
 
 
 Savestate::Savestate(const char* filename, bool save)
 {
     const char* magic = "MELN";
 
+    file = nullptr;
+    FileBuffer = nullptr;
     Error = false;
+    Finished = false;
+    StateLength = 0;
 
     if (save)
     {
         Saving = true;
 
-        if (strncmp(filename + strlen(filename) - 3, "mem", 3) == 0) // Check if the filename ends with "mem"
+        if (IsMemorySavestate(filename))
             file = fmemopen(quicksave_buf, QUICKSAVE_DEFAULT_SIZE, "wb");
         else
+        {
             file = Platform::OpenLocalFile(filename, "wb");
+            SetFileBuffer();
+        }
         
         if (!file)
         {
@@ -83,10 +106,13 @@ Savestate::Savestate(const char* filename, bool save)
     {
         Saving = false;
         
-        if (strncmp(filename + strlen(filename) - 3, "mem", 3) == 0) // Check if the filename ends with "mem"
+        if (IsMemorySavestate(filename))
             file = fmemopen(quicksave_buf, QUICKSAVE_DEFAULT_SIZE, "rb");
         else
+        {
             file = Platform::OpenFile(filename, "rb");
+            SetFileBuffer();
+        }
             
         if (!file)
         {
@@ -131,6 +157,7 @@ Savestate::Savestate(const char* filename, bool save)
 
         buf = 0;
         fread(&buf, 4, 1, file);
+        StateLength = buf;
         /*
         if (buf != len)
         {
@@ -147,28 +174,45 @@ Savestate::Savestate(const char* filename, bool save)
 
 Savestate::~Savestate()
 {
-    if (Error) return;
-
-    if (Saving)
-    {
-        if (CurSection != 0xFFFFFFFF)
-        {
-            u32 pos = (u32)ftell(file);
-            fseek(file, CurSection+4, SEEK_SET);
-
-            u32 len = pos - CurSection;
-            fwrite(&len, 4, 1, file);
-
-            fseek(file, pos, SEEK_SET);
-        }
-
-        fseek(file, 0, SEEK_END);
-        u32 len = (u32)ftell(file);
-        fseek(file, 8, SEEK_SET);
-        fwrite(&len, 4, 1, file);
-    }
+    Finish();
 
     if (file) fclose(file);
+    delete[] FileBuffer;
+}
+
+void Savestate::Finish()
+{
+    if (Finished || !file || Error || !Saving)
+        return;
+
+    if (CurSection != 0xFFFFFFFF)
+    {
+        u32 pos = (u32)ftell(file);
+        fseek(file, CurSection+4, SEEK_SET);
+
+        u32 len = pos - CurSection;
+        fwrite(&len, 4, 1, file);
+
+        fseek(file, pos, SEEK_SET);
+        CurSection = 0xFFFFFFFF;
+    }
+
+    fseek(file, 0, SEEK_END);
+    u32 len = (u32)ftell(file);
+    fseek(file, 8, SEEK_SET);
+    fwrite(&len, 4, 1, file);
+    fseek(file, len, SEEK_SET);
+
+    StateLength = len;
+    Finished = true;
+}
+
+bool Savestate::SeekAfterState()
+{
+    if (Error || Saving || !file || StateLength == 0)
+        return false;
+
+    return fseek(file, StateLength, SEEK_SET) == 0;
 }
 
 void Savestate::Section(const char* magic)

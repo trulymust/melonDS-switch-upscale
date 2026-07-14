@@ -57,10 +57,17 @@ public:
         return false;
     }
 
+    void Finish();
+    bool SeekAfterState();
     FILE* GetFile() const { return file; }
 
 private:
+    void SetFileBuffer();
+
     FILE* file;
+    u8* FileBuffer;
+    bool Finished;
+    u32 StateLength;
 };
 
 #endif // SAVESTATE_H

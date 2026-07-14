@@ -449,8 +449,17 @@ uint32_t read_memory(uint32_t address, uint8_t* buffer, uint32_t num_bytes, rc_c
 
 void capture_retroachievements_state(FILE* file)
 {
+  if (!g_client || !file)
+    return;
+
   const uint32_t buffer_size = (uint32_t)rc_client_progress_size(g_client);
+  if (buffer_size == 0)
+    return;
+
   uint8_t* buffer = (uint8_t*)malloc(buffer_size);
+  if (!buffer)
+    return;
+
   if (rc_client_serialize_progress(g_client, buffer) == RC_OK) {
     // write a marker, the buffer size, then the buffer contents
     fwrite("RCHV", 1, 4, file);
@@ -462,30 +471,31 @@ void capture_retroachievements_state(FILE* file)
 
 int restore_retroachievements_state(FILE* file)
 {
+  if (!g_client || !file)
+    return 0;
+
   char marker[4];
   uint32_t buffer_size;
   uint8_t* buffer = NULL;
-  int result = 0;
    
-  if (fread(marker, 1, 4, file) == 4 && memcmp(marker, "RCHV", 4) == 0) {
-    // found achievement data marker
-    if (fread(&buffer_size, 1, sizeof(buffer_size), file) == sizeof(buffer_size)) {
-      // allocate buffer
-      buffer = (uint8_t*)malloc(buffer_size);
-      if (buffer) {
-        if (fread(buffer, 1, buffer_size, file) != buffer_size) {
-          // failed to fill buffer, discard buffer
-          free(buffer);
-          buffer = NULL;
-        }
-      }
-    }
-  }      
+  if (fread(marker, 1, 4, file) != 4 || memcmp(marker, "RCHV", 4) != 0)
+    return 0;
 
-  result = (rc_client_deserialize_progress(g_client, buffer) == RC_OK) ? 1 : 0;
+  if (fread(&buffer_size, 1, sizeof(buffer_size), file) != sizeof(buffer_size) || buffer_size == 0)
+    return 0;
 
-  if (buffer)
+  buffer = (uint8_t*)malloc(buffer_size);
+  if (!buffer)
+    return 0;
+
+  if (fread(buffer, 1, buffer_size, file) != buffer_size) {
     free(buffer);
+    return 0;
+  }
+
+  int result = (rc_client_deserialize_progress(g_client, buffer) == RC_OK) ? 1 : 0;
+
+  free(buffer);
 
   return result;
 }
