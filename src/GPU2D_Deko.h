@@ -28,21 +28,49 @@ public:
     {
         return FinalFramebuffers[front][num];
     }
+    u32 GetFramebufferWidth() const
+    {
+        return FinalFramebufferWidth;
+    }
+    u32 GetFramebufferHeight() const
+    {
+        return FinalFramebufferHeight;
+    }
     dk::Image& Get3DFramebuffer()
     {
         return _3DFramebuffer;
+    }
+    dk::Image& Get3DFramebufferHiRes()
+    {
+        return _3DFramebufferHiRes;
+    }
+    void Set3DRenderScale(int scale)
+    {
+        _3DRenderScale = scale < 1 ? 1 : (scale > MaxRenderScale ? MaxRenderScale : scale);
     }
 
     dk::Fence FramebufferReady[2] = {};
     dk::Fence FramebufferPresented[2] = {};
 private:
+    static const u32 NativeWidth = 256;
+    static const u32 NativeHeight = 192;
+    static const u32 MaxRenderScale = 2;
+    static const u32 FinalFramebufferWidth = NativeWidth * MaxRenderScale;
+    static const u32 FinalFramebufferHeight = NativeHeight * MaxRenderScale;
+
+    int _3DRenderScale = 1;
+
     u16 DispFIFOFramebuffer[256*192];
 
     dk::Image FinalFramebuffers[2][2];
     GpuMemHeap::Allocation FinalFramebufferMemory;
+    dk::Image DisplayCaptureColorTarget;
+    GpuMemHeap::Allocation DisplayCaptureColorTargetMemory;
 
     dk::Image _3DFramebuffer;
     GpuMemHeap::Allocation _3DFramebufferMemory;
+    dk::Image _3DFramebufferHiRes;
+    GpuMemHeap::Allocation _3DFramebufferHiResMemory;
 
     dk::Image BGOBJTexture;
     GpuMemHeap::Allocation BGOBJTextureMemory;
@@ -89,6 +117,7 @@ private:
         descriptorOffset_Palettes = descriptorOffset_VRAM16+textureVRAM_Count,
         descriptorOffset_DirectBitmap = descriptorOffset_Palettes+2,
         descriptorOffset_3DFramebuffer = descriptorOffset_DirectBitmap+2,
+        descriptorOffset_3DFramebufferHiRes,
         descriptorOffset_DisabledBG,
         descriptorOffset_MosaicTable,
         descriptorOffset_OBJWindow,
@@ -165,6 +194,7 @@ private:
         u32 BlendCnt, StandardColorEffect;
         u32 EVA, EVB, EVY;
         u32 BGNumMask[4];
+        u32 RenderScale, FinalScale, HiResBGMask, __pad0;
         u32 Window[192*4];
     };
     const u32 ComposeUniformSize = (sizeof(ComposeUniform) + DK_UNIFORM_BUF_ALIGNMENT - 1) & ~(DK_UNIFORM_BUF_ALIGNMENT - 1);

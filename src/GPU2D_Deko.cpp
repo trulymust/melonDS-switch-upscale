@@ -24,7 +24,7 @@ DekoRenderer::DekoRenderer() :
 
     dk::ImageLayout finalFbLayout;
     dk::ImageLayoutMaker{Gfx::Device}
-        .setDimensions(256, 192)
+        .setDimensions(FinalFramebufferWidth, FinalFramebufferHeight)
         .setFlags(DkImageFlags_UsageRender)
         .setFormat(DkImageFormat_RGBA8_Unorm)
         .initialize(finalFbLayout);
@@ -38,6 +38,17 @@ DekoRenderer::DekoRenderer() :
                 FinalFramebufferMemory.Offset + finalFbLayout.getSize() * (i + j * 2));
         }
     }
+
+    dk::ImageLayout displayCaptureColorLayout;
+    dk::ImageLayoutMaker{Gfx::Device}
+        .setDimensions(NativeWidth, NativeHeight)
+        .setFlags(DkImageFlags_UsageRender)
+        .setFormat(DkImageFormat_RGBA8_Unorm)
+        .initialize(displayCaptureColorLayout);
+    DisplayCaptureColorTargetMemory = Gfx::TextureHeap->Alloc(displayCaptureColorLayout.getSize(), displayCaptureColorLayout.getAlignment());
+    DisplayCaptureColorTarget.initialize(displayCaptureColorLayout,
+        Gfx::TextureHeap->MemBlock,
+        DisplayCaptureColorTargetMemory.Offset);
 
     dk::ImageLayout intermedFbLayout;
     dk::ImageLayoutMaker{Gfx::Device}
@@ -55,6 +66,15 @@ DekoRenderer::DekoRenderer() :
 
     _3DFramebufferMemory = Gfx::TextureHeap->Alloc(intermedFbLayout.getSize(), intermedFbLayout.getAlignment());
     _3DFramebuffer.initialize(intermedFbLayout, Gfx::TextureHeap->MemBlock, _3DFramebufferMemory.Offset);
+
+    dk::ImageLayout hiRes3DFramebufferLayout;
+    dk::ImageLayoutMaker{Gfx::Device}
+        .setDimensions(FinalFramebufferWidth, FinalFramebufferHeight)
+        .setFlags(DkImageFlags_UsageRender|DkImageFlags_UsageLoadStore|DkImageFlags_Usage2DEngine)
+        .setFormat(DkImageFormat_R32_Uint)
+        .initialize(hiRes3DFramebufferLayout);
+    _3DFramebufferHiResMemory = Gfx::TextureHeap->Alloc(hiRes3DFramebufferLayout.getSize(), hiRes3DFramebufferLayout.getAlignment());
+    _3DFramebufferHiRes.initialize(hiRes3DFramebufferLayout, Gfx::TextureHeap->MemBlock, _3DFramebufferHiResMemory.Offset);
 
     dk::ImageLayout objWindowLayout;
     dk::ImageLayoutMaker{Gfx::Device}
@@ -159,6 +179,7 @@ DekoRenderer::DekoRenderer() :
         imageDescriptors[descriptorOffset_OBJWindow+i].initialize(dk::ImageView{OBJWindow[i]});
     }
     imageDescriptors[descriptorOffset_3DFramebuffer].initialize(dk::ImageView{_3DFramebuffer});
+    imageDescriptors[descriptorOffset_3DFramebufferHiRes].initialize(dk::ImageView{_3DFramebufferHiRes});
     imageDescriptors[descriptorOffset_DisabledBG].initialize(dk::ImageView{DisabledBG});
     imageDescriptors[descriptorOffset_MosaicTable].initialize(dk::ImageView{MosaicTable});
 
@@ -1893,18 +1914,17 @@ void DekoRenderer::ComposeBGOBJ()
 
         if (capture)
         {
-            dk::ImageView bgobj{BGOBJTexture};
-            EmuCmdBuf.bindRenderTargets({&colorTarget, &bgobj});
             shader = showDirectBitmap ? &ShaderComposeBGOBJShowBitmap : &ShaderComposeBGOBJ;
         }
         else
         {
-            EmuCmdBuf.bindRenderTargets({&colorTarget});
             shader = showDirectBitmap ? &ShaderComposeBGOBJDirectBitmapOnly : &ShaderComposeBGOBJ;
         }
         EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, shader});
 
-        DkScissor scissor = {0, firstLine, 256, region.LinesCount};
+        DkViewport finalViewport = {0.f, 0.f, (float)FinalFramebufferWidth, (float)FinalFramebufferHeight, 0.f, 1.f};
+        EmuCmdBuf.setViewports(0, {finalViewport, finalViewport});
+        DkScissor scissor = {0, firstLine * MaxRenderScale, FinalFramebufferWidth, region.LinesCount * MaxRenderScale};
         EmuCmdBuf.setScissors(0, {scissor, scissor});
         //printf("compositing region %d %d\n", firstLine, region.LinesCount);
 
@@ -1917,6 +1937,8 @@ void DekoRenderer::ComposeBGOBJ()
 
         ComposeUniform& composeUniform = ComposeUniforms[CurUnit->Num];
         int textureHandleIdx[4];
+        int captureTextureHandleIdx[4];
+        composeUniform.HiResBGMask = 0;
 
         for (int i = 0; i < 4; i++)
         {
@@ -1940,15 +1962,22 @@ void DekoRenderer::ComposeBGOBJ()
             if (!(region.DispCnt & (1<<(bgOrder[i]+8))))
             {
                 textureHandleIdx[i] = descriptorOffset_DisabledBG;
+                captureTextureHandleIdx[i] = descriptorOffset_DisabledBG;
             }
             else if (bgOrder[i] == 0 && CurUnit->Num == 0 && region.DispCnt & (1<<3))
             {
-                textureHandleIdx[i] = descriptorOffset_3DFramebuffer;
+                textureHandleIdx[i] = _3DRenderScale > 1
+                    ? descriptorOffset_3DFramebufferHiRes
+                    : descriptorOffset_3DFramebuffer;
+                captureTextureHandleIdx[i] = descriptorOffset_3DFramebuffer;
+                if (_3DRenderScale > 1)
+                    composeUniform.HiResBGMask |= 1U << i;
             }
             else
             {
                 textureHandleIdx[i] = descriptorOffset_IntermedFb +
                     fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
+                captureTextureHandleIdx[i] = textureHandleIdx[i];
             }
 
             composeUniform.BGNumMask[i] = 1 << bgOrder[i];
@@ -1979,15 +2008,52 @@ void DekoRenderer::ComposeBGOBJ()
         composeUniform.EVA = region.EVA;
         composeUniform.EVB = region.EVB;
         composeUniform.EVY = region.EVY;
+        composeUniform.RenderScale = _3DRenderScale;
+        composeUniform.FinalScale = MaxRenderScale;
         EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
             0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
             &composeUniform);
 
+        EmuCmdBuf.bindRenderTargets({&colorTarget});
         EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
+
+        if (capture)
+        {
+            DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
+            EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
+            DkScissor nativeScissor = {0, firstLine, NativeWidth, region.LinesCount};
+            EmuCmdBuf.setScissors(0, {nativeScissor, nativeScissor});
+
+            EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
+            {
+                dkMakeTextureHandle(captureTextureHandleIdx[0], 0),
+                dkMakeTextureHandle(captureTextureHandleIdx[1], 0),
+                dkMakeTextureHandle(captureTextureHandleIdx[2], 0),
+                dkMakeTextureHandle(captureTextureHandleIdx[3], 0),
+                dkMakeTextureHandle(objTextureHandleIdx, 0),
+            });
+
+            composeUniform.RenderScale = 1;
+            composeUniform.FinalScale = 1;
+            composeUniform.HiResBGMask = 0;
+            EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
+                0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
+                &composeUniform);
+
+            dk::ImageView captureColorTarget{DisplayCaptureColorTarget};
+            dk::ImageView bgobj{BGOBJTexture};
+            EmuCmdBuf.bindRenderTargets({&captureColorTarget, &bgobj});
+            EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
+        }
 
         firstLine += region.LinesCount;
     }
     assert(firstLine == 192);
+
+    DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
+    EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
+    DkScissor nativeScissor = {0, 0, NativeWidth, NativeHeight};
+    EmuCmdBuf.setScissors(0, {nativeScissor, nativeScissor});
 
     ComposeRegions[CurUnit->Num].clear();
 

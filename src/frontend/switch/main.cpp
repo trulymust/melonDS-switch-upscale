@@ -263,13 +263,14 @@ void Init()
         internalResolutionScale = 2;
     GPU::RenderSettings settings{true, internalResolutionScale, false};
     GPU::SetRenderSettings(0, settings);
+    GPU2D::DekoRenderer* renderer = (GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get();
 
     for (int j = 0; j < 2; j++)
     {
         for (int i = 0; i < 2; i++)
         {
-            FramebufferTextures[j][i] = Gfx::TextureCreateExternal(256, 192, 
-                ((GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get())->GetFramebuffer(j, i));
+            FramebufferTextures[j][i] = Gfx::TextureCreateExternal(renderer->GetFramebufferWidth(), renderer->GetFramebufferHeight(),
+                renderer->GetFramebuffer(j, i));
         }
     }
 
@@ -753,17 +754,19 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
 
     if (State != emuState_Nothing)
     {
-        Gfx::WaitForFenceReady(((GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get())->FramebufferReady[GPU::FrontBuffer]);
+        GPU2D::DekoRenderer* renderer = (GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get();
+        Gfx::WaitForFenceReady(renderer->FramebufferReady[GPU::FrontBuffer]);
         Gfx::SetSampler((Config::Filtering == 0 ? Gfx::sampler_Nearest : Gfx::sampler_Linear) | Gfx::sampler_ClampToEdge);
+        Gfx::Vector2f sourceSize{(float)renderer->GetFramebufferWidth(), (float)renderer->GetFramebufferHeight()};
         for (int i = 0; i < ScreensVisible; i++)
         {
             Gfx::DrawRectangle(FramebufferTextures[GPU::FrontBuffer][ScreenKinds[i]], 
                 ScreenPoints[i][0], ScreenPoints[i][1],
                 ScreenPoints[i][2], ScreenPoints[i][3],
-                {0.f, 0.f}, {256.f, 192.f});
+                {0.f, 0.f}, sourceSize);
         }
         
-        Gfx::SignalFence(((GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get())->FramebufferPresented[GPU::FrontBuffer]);
+        Gfx::SignalFence(renderer->FramebufferPresented[GPU::FrontBuffer]);
     }
 
     if (State == emuState_Running && touchUseCursor)

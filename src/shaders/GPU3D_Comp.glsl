@@ -1299,7 +1299,8 @@ void main()
 
 layout (local_size_x = 32) in;
 
-layout (binding = 0, r32ui) writeonly uniform uimage2D FinalFB; 
+layout (binding = 0, r32ui) writeonly uniform uimage2D FinalFB;
+layout (binding = 1, r32ui) writeonly uniform uimage2D FinalFBHiRes;
 
 uint BlendFog(uint color, uint depth)
 {
@@ -1346,17 +1347,17 @@ uint BlendFog(uint color, uint depth)
 
 void main()
 {
-    int scale = int(RenderScale);
-    int nativeSrcX = (int(gl_GlobalInvocationID.x) + XScroll) & 0x1FF;
-    int srcX = nativeSrcX * scale;
-    int srcY = int(gl_GlobalInvocationID.y) * scale;
+    int scale = max(int(RenderScale), 1);
+    int scrollWrapWidth = NativeWidth * 2 * scale;
+    int srcX = (int(gl_GlobalInvocationID.x) + int(XScroll) * scale) & (scrollWrapWidth - 1);
+    int srcY = int(gl_GlobalInvocationID.y);
     int framebufferStride = int(RenderWidth * RenderHeight);
     int resultOffset = srcX + srcY * int(RenderWidth);
 
     uvec2 color = uvec2(0);
     uvec2 depth = uvec2(0);
     uvec2 attr = uvec2(0);
-    if (nativeSrcX < NativeWidth)
+    if (srcX < int(RenderWidth))
     {
         color = uvec2(ColorResult[resultOffset], ColorResult[resultOffset+framebufferStride]);
         depth = uvec2(DepthResult[resultOffset], DepthResult[resultOffset+framebufferStride]);
@@ -1364,30 +1365,30 @@ void main()
     }
 
 #ifdef EdgeMarking
-    if (nativeSrcX < NativeWidth && (attr.x & 0xFU) != 0U)
+    if (srcX < int(RenderWidth) && (attr.x & 0xFU) != 0U)
     {
         uvec4 otherAttr = uvec4(ClearAttr);
         uvec4 otherDepth = uvec4(ClearDepth);
 
         if (srcX > 0)
         {
-            otherAttr.x = AttrResult[resultOffset-scale];
-            otherDepth.x = DepthResult[resultOffset-scale];
+            otherAttr.x = AttrResult[resultOffset-1];
+            otherDepth.x = DepthResult[resultOffset-1];
         }
-        if (srcX + scale < int(RenderWidth))
+        if (srcX + 1 < int(RenderWidth))
         {
-            otherAttr.y = AttrResult[resultOffset+scale];
-            otherDepth.y = DepthResult[resultOffset+scale];
+            otherAttr.y = AttrResult[resultOffset+1];
+            otherDepth.y = DepthResult[resultOffset+1];
         }
         if (srcY > 0)
         {
-            otherAttr.z = AttrResult[resultOffset-int(RenderWidth)*scale];
-            otherDepth.z = DepthResult[resultOffset-int(RenderWidth)*scale];
+            otherAttr.z = AttrResult[resultOffset-int(RenderWidth)];
+            otherDepth.z = DepthResult[resultOffset-int(RenderWidth)];
         }
-        if (srcY + scale < int(RenderHeight))
+        if (srcY + 1 < int(RenderHeight))
         {
-            otherAttr.w = AttrResult[resultOffset+int(RenderWidth)*scale];
-            otherDepth.w = DepthResult[resultOffset+int(RenderWidth)*scale];
+            otherAttr.w = AttrResult[resultOffset+int(RenderWidth)];
+            otherDepth.w = DepthResult[resultOffset+int(RenderWidth)];
         }
 
         uint polyId = bitfieldExtract(attr.x, 24, 5);
@@ -1465,7 +1466,14 @@ void main()
     //if (gl_LocalInvocationID.x == 7 || gl_LocalInvocationID.y == 7)
         //color.x = 0x1F00001FU | 0x40000000U;
 
-    imageStore(FinalFB, ivec2(gl_GlobalInvocationID.xy), uvec4(color.x, 0, 0, 0));
+    ivec2 highResPosition = ivec2(gl_GlobalInvocationID.xy);
+    imageStore(FinalFBHiRes, highResPosition, uvec4(color.x, 0, 0, 0));
+
+    if (scale == 1 || ((highResPosition.x | highResPosition.y) & 1) == 0)
+    {
+        ivec2 nativePosition = scale == 1 ? highResPosition : (highResPosition >> 1);
+        imageStore(FinalFB, nativePosition, uvec4(color.x, 0, 0, 0));
+    }
 }
 
 #endif

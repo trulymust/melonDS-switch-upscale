@@ -27,6 +27,7 @@ layout (std140, binding = 0) uniform ComposeUniform
     uint EVA, EVB, EVY;
 
     uint BGNumMask0, BGNumMask1, BGNumMask2, BGNumMask3;
+    uint RenderScale, FinalScale, HiResBGMask, __pad0;
     uvec4 Window[192];
 };
 
@@ -93,28 +94,29 @@ void PalettisePixel(uint indexed, out uint rb, out uint g)
 void main()
 {
     ivec2 position = ivec2(gl_FragCoord.xy);
+    ivec2 nativePosition = FinalScale > 1U ? (position >> 1) : position;
     uint finalColorRB, finalColorG;
 #ifdef ComposeBGOBJ
     // find out the two top most layers
 
-    uvec4 window = Window[position.y];
+    uvec4 window = Window[nativePosition.y];
 
-    uint objWindow = texelFetch(OBJWindow, position, 0).r;
+    uint objWindow = texelFetch(OBJWindow, nativePosition, 0).r;
 
     uint winAttr = window.x;
     if ((window.y & 0x80000000U) != 0U && objWindow != 0)
         winAttr = window.y >> 16;
-    if (uint(position.x) >= (window.z & 0xFFFFU) && uint(position.x) < (window.z >> 16))
+    if (uint(nativePosition.x) >= (window.z & 0xFFFFU) && uint(nativePosition.x) < (window.z >> 16))
         winAttr = window.x >> 16;
-    if (uint(position.x) >= (window.w & 0xFFFFU) && uint(position.x) < (window.w >> 16))
+    if (uint(nativePosition.x) >= (window.w & 0xFFFFU) && uint(nativePosition.x) < (window.w >> 16))
         winAttr = window.y;
 
-    uint bgLayer0 = texelFetch(BGLayer0, position, 0).r;
-    uint bgLayer1 = texelFetch(BGLayer1, position, 0).r;
-    uint bgLayer2 = texelFetch(BGLayer2, position, 0).r;
-    uint bgLayer3 = texelFetch(BGLayer3, position, 0).r;
+    uint bgLayer0 = texelFetch(BGLayer0, (HiResBGMask & (1U<<0)) != 0U ? position : nativePosition, 0).r;
+    uint bgLayer1 = texelFetch(BGLayer1, (HiResBGMask & (1U<<1)) != 0U ? position : nativePosition, 0).r;
+    uint bgLayer2 = texelFetch(BGLayer2, (HiResBGMask & (1U<<2)) != 0U ? position : nativePosition, 0).r;
+    uint bgLayer3 = texelFetch(BGLayer3, (HiResBGMask & (1U<<3)) != 0U ? position : nativePosition, 0).r;
 
-    uint spriteLayer = texelFetch(SpriteLayer, position, 0).r;
+    uint spriteLayer = texelFetch(SpriteLayer, nativePosition, 0).r;
 
     if ((winAttr & BGNumMask0) == 0U)
         bgLayer0 = 0U;
@@ -255,7 +257,7 @@ void main()
     finalColorG = layer0G;
 #endif
 #ifdef ShowBitmap
-    uint color = texelFetch(DirectBitmap, position, 0).r;
+    uint color = texelFetch(DirectBitmap, nativePosition, 0).r;
 
     finalColorRB = ((color & 0x1FU) << 1) | ((color & 0x7C00) << 7);
     finalColorG = (color & 0x3E0U) >> 4;

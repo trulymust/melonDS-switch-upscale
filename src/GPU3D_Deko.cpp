@@ -97,6 +97,7 @@ bool DekoRenderer::Init()
         dk::ImageDescriptor* descriptors = Gfx::DataHeap->CpuAddr<dk::ImageDescriptor>(ImageDescriptors);
         descriptors[descriptorOffset_YSpanIndices].initialize(YSpanIndicesTexture, true);
         descriptors[descriptorOffset_FinalFB].initialize(((GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get())->Get3DFramebuffer(), true);
+        descriptors[descriptorOffset_FinalFBHiRes].initialize(((GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get())->Get3DFramebufferHiRes(), true);
     }
 
     {
@@ -155,6 +156,8 @@ void DekoRenderer::SetRenderSettings(GPU::RenderSettings& settings)
     ScreenHeight = NativeHeight * RenderScale;
     TilesPerLine = ScreenWidth / TileSize;
     TileLines = ScreenHeight / TileSize;
+
+    ((GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get())->Set3DRenderScale(RenderScale);
 }
 
 void DekoRenderer::VCount144()
@@ -1379,7 +1382,11 @@ void DekoRenderer::RenderFrame()
     EmuCmdBuf.dispatchCompute(ScreenWidth/TileSize, ScreenHeight/TileSize, 1);
     EmuCmdBuf.barrier(DkBarrier_Primitives, 0);
 
-    EmuCmdBuf.bindImages(DkStage_Compute, 0, {dkMakeImageHandle(descriptorOffset_FinalFB)});
+    EmuCmdBuf.bindImages(DkStage_Compute, 0,
+    {
+        dkMakeImageHandle(descriptorOffset_FinalFB),
+        dkMakeImageHandle(descriptorOffset_FinalFBHiRes),
+    });
     u32 finalPassShader = 0;
     if (RenderDispCnt & (1<<4))
         finalPassShader |= 0x4;
@@ -1388,7 +1395,7 @@ void DekoRenderer::RenderFrame()
     if (RenderDispCnt & (1<<5))
         finalPassShader |= 0x1;
     EmuCmdBuf.bindShaders(DkStageFlag_Compute, {&ShaderFinalPass[finalPassShader]});
-    EmuCmdBuf.dispatchCompute(NativeWidth/32, NativeHeight, 1);
+    EmuCmdBuf.dispatchCompute(ScreenWidth/32, ScreenHeight, 1);
     EmuCmdBuf.barrier(DkBarrier_Primitives, 0);
 
     DkCmdList cmdlist = CmdMem.End(EmuCmdBuf);

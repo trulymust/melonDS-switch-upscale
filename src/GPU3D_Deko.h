@@ -101,6 +101,7 @@ private:
     {
         descriptorOffset_YSpanIndices,
         descriptorOffset_FinalFB,
+        descriptorOffset_FinalFBHiRes,
         descriptorOffset_WhiteTexture,
         descriptorOffset_TexcacheStart,
         descriptorOffset_Count = descriptorOffset_TexcacheStart + TexCacheMaxImages
