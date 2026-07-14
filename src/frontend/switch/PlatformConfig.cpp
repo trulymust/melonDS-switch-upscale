@@ -37,6 +37,7 @@ int LimitFramerate;
 int ShowPerformanceMetrics;
 
 int EnableCheats = 1;
+int Language = 0;
 
 char RetroAchievementsUsername[64] = "";
 char RetroAchievementsToken[64] = "";
@@ -107,6 +108,7 @@ ConfigEntry PlatformConfigFile[] =
     {"ShowPerformanceMetrics",  0, &ShowPerformanceMetrics, 0, NULL, 0},
 
     {"LimitFramerate",          0, &LimitFramerate,         1, NULL, 0},
+    {"Language",                0, &Language,               0, NULL, 0},
 
     {"RetroAchievementsUsername",   1, RetroAchievementsUsername,          0, "\0",   63},
     {"RetroAchievementsToken",      1, RetroAchievementsToken,             0, "\0",   63},

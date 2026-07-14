@@ -1,5 +1,6 @@
 #include "BackButton.h"
 #include "KeyExplanations.h"
+#include "Localization.h"
 #include "Style.h"
 #include "main.h"
 
@@ -13,7 +14,7 @@ void DoGui(BoxGui::Frame& parent, const char* title)
     bool selected = BoxGui::InputElement(backButton, BoxGui::MakeUniqueName("backbutton", 0));
     if (selected)
     {
-        KeyExplanation::Explain(KeyExplanation::button_A, "Back");
+        KeyExplanation::Explain(KeyExplanation::button_A, Localization::Text("Back"));
         if (BoxGui::ConfirmPressed())
             GoBack();
     }

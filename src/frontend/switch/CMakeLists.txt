@@ -10,6 +10,7 @@ SET(SOURCES_SWITCH
     Filebrowser.cpp
     KeyExplanations.cpp
     ROMMetaDatabase.cpp
+    Localization.cpp
     SettingsDialog.cpp
     StartMenu.cpp
     FaultHandler.cpp

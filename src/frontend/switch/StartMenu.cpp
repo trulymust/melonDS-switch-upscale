@@ -5,6 +5,7 @@
 #include "main.h"
 #include "ROMMetaDatabase.h"
 #include "ErrorDialog.h"
+#include "Localization.h"
 
 #include "PlatformConfig.h"
 #include "RetroAchievements.h"
@@ -20,6 +21,11 @@
 
 namespace StartMenu
 {
+
+static const char* Tr(const char* text)
+{
+    return Localization::Text(text);
+}
 
 struct LastPlayedROM
 {
@@ -99,7 +105,7 @@ bool SideBarEntry(BoxGui::Frame& optionsFrame, BoxGui::Skewer& optionSkewer, con
     if (selected)
     {
         Gfx::DrawRectangle(buttonFrame.Area.Position, buttonFrame.Area.Size, WidgetColorVibrant);
-        KeyExplanation::Explain(KeyExplanation::button_A, "Select");
+        KeyExplanation::Explain(KeyExplanation::button_A, Tr("Select"));
     }
 
     BoxGui::Skewer buttonSkewer{buttonFrame, buttonFrame.Area.Size.Y/2.f, BoxGui::direction_Horizontal};
@@ -136,73 +142,73 @@ void DoGui(BoxGui::Frame& parent)
 
         if (Emulation::State == Emulation::emuState_Paused)
         {
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Continue", true))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Continue"), true))
             {
                 Emulation::SetPause(false);
             }
             sideBarSkewer.Advance(spacing);
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, Emulation::LidClosed ? "Open lid" : "Close lid"))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Emulation::LidClosed ? Tr("Open lid") : Tr("Close lid")))
             {
                 Emulation::LidClosed ^= true;
                 Emulation::SetPause(false);
             }
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Reset", true))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Reset"), true))
             {
                 Emulation::Reset();
             }
             sideBarSkewer.Advance(spacing);
-            if (isConnected() && SideBarEntry(sideBarFrame, sideBarSkewer, "RetroAchievements List")) 
+            if (isConnected() && SideBarEntry(sideBarFrame, sideBarSkewer, Tr("RetroAchievements List")))
             {
                 CurrentUiScreen = uiScreen_RetroAchievements;   
             }
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Cheats"))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Cheats")))
             {
                 CurrentUiScreen = uiScreen_Cheats;
             }
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Display settings"))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Display settings")))
             {
                 CurrentUiScreen = uiScreen_DisplaySettings;
             }
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Input settings", true))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Input settings"), true))
             {
                 CurrentUiScreen = uiScreen_InputSettings;
             }
             sideBarSkewer.Advance(spacing);
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Close", true))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Close"), true))
             {
                 Emulation::Stop();
                 g_loadAchievements = true;
             }
 
-            KeyExplanation::Explain(KeyExplanation::button_B, "Unpause");
+            KeyExplanation::Explain(KeyExplanation::button_B, Tr("Unpause"));
             if (BoxGui::CancelPressed())
                 Emulation::SetPause(false);
         }
         else
         {
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Browse", true))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Browse"), true))
             {
                 CurrentUiScreen = uiScreen_BrowseROM;
             }
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Boot firmware", true))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Boot firmware"), true))
             {
                 Emulation::LoadBIOS();
             }
             sideBarSkewer.Advance(spacing);
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Emulation settings"))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Emulation settings")))
             {
                 CurrentUiScreen = uiScreen_EmulationSettings;
             }
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Display settings"))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Display settings")))
             {
                 CurrentUiScreen = uiScreen_DisplaySettings;
             }
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Input settings", true))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Input settings"), true))
             {
                 CurrentUiScreen = uiScreen_InputSettings;
             }
             sideBarSkewer.Advance(spacing);
-            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Exit", true))
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, Tr("Exit"), true))
             {
                 Done = true;
             }
@@ -231,7 +237,7 @@ void DoGui(BoxGui::Frame& parent)
             vskewer.Advance(20.f);
 
             BoxGui::Frame titleFrame{mainFrame, vskewer.Spit({0.f, TextLineHeight * 3.f}, Gfx::align_Right), {15.f, 15.f}, {15.f, 15.f}};
-            Gfx::DrawText(Gfx::SystemFontStandard, titleFrame.Area.Position, TextLineHeight * 2.5f, DarkColor, "Last played...");
+            Gfx::DrawText(Gfx::SystemFontStandard, titleFrame.Area.Position, TextLineHeight * 2.5f, DarkColor, Tr("Last played..."));
 
             vskewer.Advance(15.f);
 
@@ -278,7 +284,7 @@ void DoGui(BoxGui::Frame& parent)
 
             if (selectedEntry != -1)
             {
-                KeyExplanation::Explain(KeyExplanation::button_A, "Start");
+                KeyExplanation::Explain(KeyExplanation::button_A, Tr("Start"));
                 if (BoxGui::ConfirmPressed())
                 {
                     Emulation::LoadROM(LastPlayedROMs[selectedEntry].Path.c_str());
@@ -290,12 +296,12 @@ void DoGui(BoxGui::Frame& parent)
         {
             BoxGui::Frame titleFrame{mainFrame, vskewer.Spit({0.f, TextLineHeight * 3.f}, Gfx::align_Right), {15.f, 15.f}, {15.f, 15.f}};
             if (!Config::hardcoreMode) {
-                Gfx::DrawText(Gfx::SystemFontStandard, titleFrame.Area.Position, TextLineHeight * 2.5f, DarkColor, "Savestates");
+                Gfx::DrawText(Gfx::SystemFontStandard, titleFrame.Area.Position, TextLineHeight * 2.5f, DarkColor, Tr("Savestates"));
 
                 vskewer.Advance(20.f);
     
                 BoxGui::Frame saveTitleFrame{mainFrame, vskewer.Spit({0.f, TextLineHeight * 2.f}, Gfx::align_Right), {15.f, 0.f}};
-                Gfx::DrawText(Gfx::SystemFontStandard, saveTitleFrame.Area.Position, TextLineHeight*1.5f, DarkColor, "Save state");
+                Gfx::DrawText(Gfx::SystemFontStandard, saveTitleFrame.Area.Position, TextLineHeight*1.5f, DarkColor, Tr("Save state"));
                 vskewer.Advance(10.f);
     
                 BoxGui::Frame savestateFrame{mainFrame,
@@ -337,7 +343,7 @@ void DoGui(BoxGui::Frame& parent)
                 Gfx::PopScissor();
                 if (savestateSelected != -1)
                 {
-                    KeyExplanation::Explain(KeyExplanation::button_A, "Save state");
+                    KeyExplanation::Explain(KeyExplanation::button_A, Tr("Save state"));
                     if (BoxGui::ConfirmPressed())
                     {
                         char filename[512];
@@ -345,13 +351,13 @@ void DoGui(BoxGui::Frame& parent)
                         if (Frontend::SaveState(filename))
                             SavestateMask |= 1<<savestateSelected;
                         else
-                            ErrorDialog::Open("Failed to create savestate");
+                            ErrorDialog::Open(Tr("Failed to create savestate"));
                     }
                 }
                 vskewer.Advance(15.f);
     
                 BoxGui::Frame loadTitleFrame{mainFrame, vskewer.Spit({0.f, TextLineHeight * 2.f}, Gfx::align_Right), {15.f, 0.f}};
-                Gfx::DrawText(Gfx::SystemFontStandard, loadTitleFrame.Area.Position, TextLineHeight*1.5f, DarkColor, "Load state");
+                Gfx::DrawText(Gfx::SystemFontStandard, loadTitleFrame.Area.Position, TextLineHeight*1.5f, DarkColor, Tr("Load state"));
                 vskewer.Advance(10.f);
     
                 BoxGui::Frame loadstateFrame{mainFrame,
@@ -388,7 +394,7 @@ void DoGui(BoxGui::Frame& parent)
                             loadbutton.Area.Position+loadbutton.Area.Size*0.5f, TextLineHeight,
                             fontColor,
                             Gfx::align_Center, Gfx::align_Center,
-                            "Undo\nload");
+                            Tr("Undo\nload"));
                     }
                     else
                     {
@@ -410,7 +416,7 @@ void DoGui(BoxGui::Frame& parent)
     
                 if (loadstateSelected != -1)
                 {
-                    KeyExplanation::Explain(KeyExplanation::button_A, "Load state");
+                    KeyExplanation::Explain(KeyExplanation::button_A, Tr("Load state"));
                     if (BoxGui::ConfirmPressed())
                     {
                         bool loadedSuccessfully;
@@ -433,7 +439,7 @@ void DoGui(BoxGui::Frame& parent)
                         }
                         else
                         {
-                            ErrorDialog::Open("Couldn't load savefile");
+                            ErrorDialog::Open(Tr("Couldn't load savefile"));
                         }
                     }
                 }

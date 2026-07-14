@@ -11,6 +11,7 @@
 #include "PlatformConfig.h"
 #include "InputConfig.h"
 #include "ARCodeFile.h"
+#include "Localization.h"
 #include "../FrontendUtil.h"
 
 #include <string.h>
@@ -24,6 +25,11 @@ namespace {
     static u64 PlatformKeysDown = 0;
     static u64 PreviousKeys = 0;
     static int AppliedUpscaleFactor = -1;
+
+    static const char* Tr(const char* text)
+    {
+        return Localization::Text(text);
+    }
 }
 
 static PadState pad;
@@ -96,7 +102,7 @@ void DoCheckbox(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name,
     }
     if (selected)
     {
-        KeyExplanation::Explain(KeyExplanation::button_A, "Toggle");
+        KeyExplanation::Explain(KeyExplanation::button_A, Tr("Toggle"));
     }
 
     // a bit wasteful
@@ -141,7 +147,7 @@ bool DoCheckboxWithId(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char*
     }
     if (selected)
     {
-        KeyExplanation::Explain(KeyExplanation::button_A, "Toggle");
+        KeyExplanation::Explain(KeyExplanation::button_A, Tr("Toggle"));
     }
 
     Gfx::DrawRectangle(settingFrame.Area.Position - Gfx::Vector2f{0.f, 5.f}, settingFrame.Area.Size + Gfx::Vector2f{0.f, 5.f*2.f}, WidgetColorBright, true);
@@ -236,7 +242,7 @@ void DoCombobox(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name,
                         Gfx::DrawText(Gfx::SystemFontNintendoExt, optionSkewer.CurrentPosition(), TextLineHeight, DarkColor,
                             Gfx::align_Left, Gfx::align_Center, GFX_NINTENDOFONT_CHECKMARK);
 
-                        KeyExplanation::Explain(KeyExplanation::button_A, "Choose");
+                        KeyExplanation::Explain(KeyExplanation::button_A, Tr("Choose"));
                     }
                     optionSkewer.AlignLeft(50.f);
 
@@ -259,7 +265,7 @@ void DoCombobox(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name,
                 if (SelectedOption >= i)
                     SelectedOption = 0;
 
-                KeyExplanation::Explain(KeyExplanation::button_B, "Cancel");
+                KeyExplanation::Explain(KeyExplanation::button_B, Tr("Cancel"));
 
                 const double fadeoutLength = 0.25;
                 if (BoxGui::CancelPressed())
@@ -280,7 +286,7 @@ void DoCombobox(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name,
     }
     if (selected)
     {
-        KeyExplanation::Explain(KeyExplanation::button_A, "Choose");
+        KeyExplanation::Explain(KeyExplanation::button_A, Tr("Choose"));
     }
 
     Gfx::DrawRectangle(settingFrame.Area.Position - Gfx::Vector2f{0.f, 5.f}, settingFrame.Area.Size + Gfx::Vector2f{0.f, 5.f*2.f}, WidgetColorBright, true);
@@ -352,7 +358,7 @@ void DoTextField(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* labe
 
     if (selected)
     {
-        KeyExplanation::Explain(KeyExplanation::button_A, "Edit");
+        KeyExplanation::Explain(KeyExplanation::button_A, Tr("Edit"));
     }
 
     Gfx::DrawRectangle(settingFrame.Area.Position - Gfx::Vector2f{0.f, 5.f}, settingFrame.Area.Size + Gfx::Vector2f{0.f, 5.f*2.f}, WidgetColorBright, true);
@@ -608,7 +614,7 @@ void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
 
                 BoxGui::Frame msgFrame{dialogFrame, dialogSkewer.Spit({dialogFrame.Area.Size.X, TextLineHeight * 2.f}, Gfx::align_Right), {5.f, 5.f}, {5.f, 5.f}};
                 Gfx::DrawText(Gfx::SystemFontStandard, msgFrame.Area.Position + Gfx::Vector2f{15.f, 0.f}, TextLineHeight * 1.5f, DarkColor,
-                    Gfx::align_Left, Gfx::align_Left, "Waiting for input...");
+                    Gfx::align_Left, Gfx::align_Left, Tr("Waiting for input..."));
 
                 const double elapsedInput = Gfx::AnimationTimestamp - StartTimestamp;
 
@@ -634,7 +640,7 @@ void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
                 if (elapsed > 10.0 || BoxGui::CancelPressed())
                     EndTimestamp = 0.f;
 
-                KeyExplanation::Explain(KeyExplanation::button_B, "Cancel");
+                KeyExplanation::Explain(KeyExplanation::button_B, Tr("Cancel"));
                 KeyExplanation::DoGui(rootFrame);
 
                 const double fadeoutLength = 0.25;
@@ -647,7 +653,7 @@ void DoInputButton(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* na
 
     if (selected)
     {
-        KeyExplanation::Explain(KeyExplanation::button_A, "Remap");
+        KeyExplanation::Explain(KeyExplanation::button_A, Tr("Remap"));
     }
 
     Gfx::DrawRectangle(settingFrame.Area.Position - Gfx::Vector2f{0.f, 5.f}, settingFrame.Area.Size + Gfx::Vector2f{0.f, 5.f*2.f}, WidgetColorBright, true);
@@ -712,32 +718,32 @@ void DoGui(BoxGui::Frame& parent)
     switch (CurrentUiScreen)
     {
     case uiScreen_EmulationSettings:
-        title = "Emulation settings";
+        title = Tr("Emulation settings");
         {
-            SectionHeader(settingsFrame, settingsSkewer, "General");
-            DoCombobox(settingsFrame, settingsSkewer, "Console mode", "DS\0DSi (experimental)\0", Config::ConsoleType, true);
+            SectionHeader(settingsFrame, settingsSkewer, Tr("General"));
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Console mode"), Localization::Options(Localization::OptionList::ConsoleMode), Config::ConsoleType, true);
             if (Config::ConsoleType == 0)
             {
                 bool bootDirectly = Config::DirectBoot;
-                DoCheckbox(settingsFrame, settingsSkewer, "Boot directly (Skip bios)", bootDirectly);
+                DoCheckbox(settingsFrame, settingsSkewer, Tr("Boot directly (Skip bios)"), bootDirectly);
                 Config::DirectBoot = bootDirectly;
             }
-            DoCombobox(settingsFrame, settingsSkewer, "Switch CPU clock", "1020 MHz\0" "1224 MHz\0" "1581 MHz\0" "1785 MHz\0" "918 Mhz\0" "816 Mhz\0" "714 Mhz\0", Config::SwitchOverclock);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Switch CPU clock"), Localization::Options(Localization::OptionList::SwitchCpuClock), Config::SwitchOverclock);
         }
         {
             bool jitEnable = Config::JIT_Enable;
-            SectionHeader(settingsFrame, settingsSkewer, "JIT recompiler");
+            SectionHeader(settingsFrame, settingsSkewer, Tr("JIT recompiler"));
             bool branchOptimisations = Config::JIT_BranchOptimisations;
             bool literalOptimisations = Config::JIT_LiteralOptimisations;
             bool fastMemory = Config::JIT_FastMemory;
 
-            DoCheckbox(settingsFrame, settingsSkewer, "Enable JIT recompiler", jitEnable, true);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Enable JIT recompiler"), jitEnable, true);
             if (jitEnable)
             {
-                DoSlider(settingsFrame, settingsSkewer, "Maximum block size", Config::JIT_MaxBlockSize, 1, 32);
-                DoCheckbox(settingsFrame, settingsSkewer, "Enable JIT Branch Optimisations", branchOptimisations);
-                DoCheckbox(settingsFrame, settingsSkewer, "Enable JIT Literal Optimisations", literalOptimisations);
-                DoCheckbox(settingsFrame, settingsSkewer, "Enable JIT Fast Memory", fastMemory);
+                DoSlider(settingsFrame, settingsSkewer, Tr("Maximum block size"), Config::JIT_MaxBlockSize, 1, 32);
+                DoCheckbox(settingsFrame, settingsSkewer, Tr("Enable JIT Branch Optimisations"), branchOptimisations);
+                DoCheckbox(settingsFrame, settingsSkewer, Tr("Enable JIT Literal Optimisations"), literalOptimisations);
+                DoCheckbox(settingsFrame, settingsSkewer, Tr("Enable JIT Fast Memory"), fastMemory);
             }
 
             Config::JIT_Enable = jitEnable;
@@ -755,62 +761,67 @@ void DoGui(BoxGui::Frame& parent)
                 username[sizeof(username) - 1] = '\0';
             }
 
-            SectionHeader(settingsFrame, settingsSkewer, "RetroAchievements");
-            DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Username", username, sizeof(username));
-            DoTextField(settingsFrame, settingsSkewer, "RetroAchievements Password", password, sizeof(password));
-            DoCheckbox(settingsFrame, settingsSkewer, "Login", loginRA);
+            SectionHeader(settingsFrame, settingsSkewer, Tr("RetroAchievements"));
+            DoTextField(settingsFrame, settingsSkewer, Tr("RetroAchievements Username"), username, sizeof(username));
+            DoTextField(settingsFrame, settingsSkewer, Tr("RetroAchievements Password"), password, sizeof(password));
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Login"), loginRA);
             if (loginRA)
                 InitRetroAchievements(username, password, false);
 
-            DoCheckbox(settingsFrame, settingsSkewer, "Hardcore Mode", hardcore);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Hardcore Mode"), hardcore);
             Config::hardcoreMode = hardcore;
 
-            DoCheckbox(settingsFrame, settingsSkewer, "Disable RA notifications", notification);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Disable RA notifications"), notification);
             Config::notification = notification;
         }
         break;
     case uiScreen_DisplaySettings:
-        title = "Presentation settings";
+        title = Tr("Presentation settings");
         {
-            SectionHeader(settingsFrame, settingsSkewer, "Framerate");
+            SectionHeader(settingsFrame, settingsSkewer, Tr("Framerate"));
             bool limitFramerate = Config::LimitFramerate;
-            DoCheckbox(settingsFrame, settingsSkewer, "Limit framerate", limitFramerate, true);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Limit framerate"), limitFramerate, true);
             Config::LimitFramerate = limitFramerate;
         }
         {
-            SectionHeader(settingsFrame, settingsSkewer, "GUI");
+            SectionHeader(settingsFrame, settingsSkewer, Tr("GUI"));
 
-            DoCombobox(settingsFrame, settingsSkewer, "Global rotation", "0°\090°\000180°\000270°\0", Config::GlobalRotation, true);
+            if (Config::Language < 0 || Config::Language >= Localization::Language_Max)
+                Config::Language = Localization::Language_English;
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Language"), Localization::Options(Localization::OptionList::Language), Config::Language, true);
+            if (Config::Language < 0 || Config::Language >= Localization::Language_Max)
+                Config::Language = Localization::Language_English;
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Global rotation"), Localization::Options(Localization::OptionList::Rotation), Config::GlobalRotation);
             bool showPerformanceMetrics = Config::ShowPerformanceMetrics;
-            DoCheckbox(settingsFrame, settingsSkewer, "Show performance metrics", showPerformanceMetrics);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Show performance metrics"), showPerformanceMetrics);
             Config::ShowPerformanceMetrics = showPerformanceMetrics;
         }
         {
-            SectionHeader(settingsFrame, settingsSkewer, "Screens");
+            SectionHeader(settingsFrame, settingsSkewer, Tr("Screens"));
 
-            DoCombobox(settingsFrame, settingsSkewer, "Rotation", "0°\090°\000180°\000270°\0", Config::ScreenRotation, true);
-            DoCombobox(settingsFrame, settingsSkewer, "Sizing", "Even\0Emphasise top\0Emphasise bottom\0Auto\0Top only\0Bottom only\0", Config::ScreenSizing);
-            DoCombobox(settingsFrame, settingsSkewer, "Gap", "0\0001\08\00016\00032\00064\0090\000128\0", Config::ScreenGap);
-            DoCombobox(settingsFrame, settingsSkewer, "Layout", "Natural\0Vertical\0Horizontal\0Hybrid\0", Config::ScreenLayout);
-            DoCombobox(settingsFrame, settingsSkewer, "Aspect ratio top", "4:3 (native)\00016:9\0", Config::ScreenAspectTop);
-            DoCombobox(settingsFrame, settingsSkewer, "Aspect ratio bottom", "4:3 (native)\00016:9\0", Config::ScreenAspectBot);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Rotation"), Localization::Options(Localization::OptionList::Rotation), Config::ScreenRotation, true);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Sizing"), Localization::Options(Localization::OptionList::ScreenSizing), Config::ScreenSizing);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Gap"), Localization::Options(Localization::OptionList::ScreenGap), Config::ScreenGap);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Layout"), Localization::Options(Localization::OptionList::ScreenLayout), Config::ScreenLayout);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Aspect ratio top"), Localization::Options(Localization::OptionList::AspectRatio), Config::ScreenAspectTop);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Aspect ratio bottom"), Localization::Options(Localization::OptionList::AspectRatio), Config::ScreenAspectBot);
             bool screenSwap = Config::ScreenSwap;
-            DoCheckbox(settingsFrame, settingsSkewer, "Swap screens", screenSwap);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Swap screens"), screenSwap);
             Config::ScreenSwap = screenSwap;
             bool integerScaling = Config::IntegerScaling;
-            DoCheckbox(settingsFrame, settingsSkewer, "Integer scaling", integerScaling);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Integer scaling"), integerScaling);
             Config::IntegerScaling = integerScaling;
             if (Config::Filtering < 0)
                 Config::Filtering = 0;
             if (Config::Filtering > 2)
                 Config::Filtering = 2;
-            DoCombobox(settingsFrame, settingsSkewer, "Filtering", "Nearest\0Linear\0Sharp\0", Config::Filtering);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Filtering"), Localization::Options(Localization::OptionList::Filtering), Config::Filtering);
             if (Config::Filtering < 0)
                 Config::Filtering = 0;
             if (Config::Filtering > 2)
                 Config::Filtering = 2;
             Config::ClampInternalResolutionOption();
-            DoCombobox(settingsFrame, settingsSkewer, "3D internal resolution", "1x\0" "2x\0" "4x\0", Config::upscaleFactor);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("3D internal resolution"), Localization::Options(Localization::OptionList::InternalResolution), Config::upscaleFactor);
             Config::ClampInternalResolutionOption();
             if (Config::upscaleFactor != AppliedUpscaleFactor && Emulation::State != Emulation::emuState_Nothing)
             {
@@ -822,14 +833,14 @@ void DoGui(BoxGui::Frame& parent)
         Emulation::UpdateScreenLayout();
         break;
     case uiScreen_RetroAchievements:
-        title = "RetroAchievements List";
+        title = Tr("RetroAchievements List");
         {    
             if (g_loadAchievements) {
                 g_achievements = achievements_list();   
             }
             if (g_achievements.empty()) {
-                DoLabel(settingsFrame, settingsSkewer, "This title does not have any achievements.");
-                DoLabel(settingsFrame, settingsSkewer, "Please check the RetroAchievements website for more information.");
+                DoLabel(settingsFrame, settingsSkewer, Tr("This title does not have any achievements."));
+                DoLabel(settingsFrame, settingsSkewer, Tr("Please check the RetroAchievements website for more information."));
             } else {
                 for (const auto& ach : g_achievements) {
                     SectionHeader(settingsFrame, settingsSkewer, ach.title.c_str());
@@ -843,13 +854,13 @@ void DoGui(BoxGui::Frame& parent)
         }
         break;
     case uiScreen_Cheats:
-        title = "Cheats";
+        title = Tr("Cheats");
         {
-            SectionHeader(settingsFrame, settingsSkewer, "Action Replay");
+            SectionHeader(settingsFrame, settingsSkewer, Tr("Action Replay"));
 
             bool cheatsEnabled = Config::EnableCheats != 0;
             bool oldCheatsEnabled = cheatsEnabled;
-            DoCheckbox(settingsFrame, settingsSkewer, "Enable cheats", cheatsEnabled, true);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Enable cheats"), cheatsEnabled, true);
             if (cheatsEnabled != oldCheatsEnabled)
             {
                 Config::EnableCheats = cheatsEnabled ? 1 : 0;
@@ -859,15 +870,15 @@ void DoGui(BoxGui::Frame& parent)
             ARCodeFile* cheatFile = Frontend::GetCheatFile();
             if (!cheatFile)
             {
-                DoLabel(settingsFrame, settingsSkewer, "No game is loaded.");
-                DoLabel(settingsFrame, settingsSkewer, "Start a game before editing cheats.");
+                DoLabel(settingsFrame, settingsSkewer, Tr("No game is loaded."));
+                DoLabel(settingsFrame, settingsSkewer, Tr("Start a game before editing cheats."));
                 break;
             }
 
             if (cheatFile->Categories.empty())
             {
-                DoLabel(settingsFrame, settingsSkewer, "No cheat codes found.");
-                DoLabel(settingsFrame, settingsSkewer, "Place a matching .mch file next to the ROM.");
+                DoLabel(settingsFrame, settingsSkewer, Tr("No cheat codes found."));
+                DoLabel(settingsFrame, settingsSkewer, Tr("Place a matching .mch file next to the ROM."));
                 break;
             }
 
@@ -879,7 +890,7 @@ void DoGui(BoxGui::Frame& parent)
 
                 if (cat.Codes.empty())
                 {
-                    DoLabel(settingsFrame, settingsSkewer, "No codes in this category.");
+                    DoLabel(settingsFrame, settingsSkewer, Tr("No codes in this category."));
                     continue;
                 }
 
@@ -891,29 +902,29 @@ void DoGui(BoxGui::Frame& parent)
                     {
                         code.Enabled = enabled;
                         if (!Frontend::SaveCheats())
-                            ErrorDialog::Open("Failed to save cheat file.");
+                            ErrorDialog::Open(Tr("Failed to save cheat file."));
                     }
                 }
             }
         }
         break;
     case uiScreen_InputSettings:
-        title = "Input settings";
+        title = Tr("Input settings");
 
         padUpdate(&pad);
         {
-            SectionHeader(settingsFrame, settingsSkewer, "Touchscreen");
+            SectionHeader(settingsFrame, settingsSkewer, Tr("Touchscreen"));
             
-            DoCombobox(settingsFrame, settingsSkewer, "Cursor mode", "Mouse mode\0Offset mode\0Motion controls!\0", Config::TouchscreenMode, true);
-            DoCombobox(settingsFrame, settingsSkewer, "Click mode", "Hold\0Toggle\0", Config::TouchscreenClickMode);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Cursor mode"), Localization::Options(Localization::OptionList::CursorMode), Config::TouchscreenMode, true);
+            DoCombobox(settingsFrame, settingsSkewer, Tr("Click mode"), Localization::Options(Localization::OptionList::ClickMode), Config::TouchscreenClickMode);
             bool leftHanded = Config::LeftHandedMode;
-            DoCheckbox(settingsFrame, settingsSkewer, "Left handed mode", leftHanded);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Left handed mode"), leftHanded);
             Config::LeftHandedMode = leftHanded;
         }
         {
-            SectionHeader(settingsFrame, settingsSkewer, "Joycon");
+            SectionHeader(settingsFrame, settingsSkewer, Tr("Joycon"));
             bool fastforward = Config::FastForward;
-            DoCheckbox(settingsFrame, settingsSkewer, "Hold to fastforward (ZL)", fastforward);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Hold to fastforward (ZL)"), fastforward);
             Config::FastForward = fastforward;
         }
         {
@@ -922,7 +933,7 @@ void DoGui(BoxGui::Frame& parent)
             static bool saveMapping = false;
             static bool loadMapping = false;
 
-            SectionHeader(settingsFrame, settingsSkewer, "Buttons Remapping");
+            SectionHeader(settingsFrame, settingsSkewer, Tr("Buttons Remapping"));
 
             DoInputButton(settingsFrame, settingsSkewer, "A: ", InputConfig::ButtonA);
             DoInputButton(settingsFrame, settingsSkewer, "B: ", InputConfig::ButtonB);
@@ -956,7 +967,7 @@ void DoGui(BoxGui::Frame& parent)
             DoInputButton(settingsFrame, settingsSkewer, "Right SL: ", InputConfig::ButtonRightSL);
             DoInputButton(settingsFrame, settingsSkewer, "Right SR: ", InputConfig::ButtonRightSR);
 
-            SectionHeader(settingsFrame, settingsSkewer, "Hotkeys Remapping");
+            SectionHeader(settingsFrame, settingsSkewer, Tr("Hotkeys Remapping"));
 
             DoInputButton(settingsFrame, settingsSkewer, "Pause ", InputConfig::Pause);
             DoInputButton(settingsFrame, settingsSkewer, "Simulate Mic Noise: ", InputConfig::MicNoise);
@@ -965,9 +976,9 @@ void DoGui(BoxGui::Frame& parent)
             DoInputButton(settingsFrame, settingsSkewer, "QuickSave: ", InputConfig::QuickSave);
             DoInputButton(settingsFrame, settingsSkewer, "QuickLoad: ", InputConfig::QuickLoad);
             
-            DoCheckbox(settingsFrame, settingsSkewer, "Reset to default", defaultMapping);
-            DoCheckbox(settingsFrame, settingsSkewer, "Save this configuration", saveMapping);
-            DoCheckbox(settingsFrame, settingsSkewer, "Load old configuration", loadMapping);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Reset to default"), defaultMapping);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Save this configuration"), saveMapping);
+            DoCheckbox(settingsFrame, settingsSkewer, Tr("Load old configuration"), loadMapping);
 
             if (defaultMapping) {
                 InputConfig::ResetToDefault();
@@ -991,7 +1002,7 @@ void DoGui(BoxGui::Frame& parent)
 
     BackButton::DoGui(parent, title);
 
-    KeyExplanation::Explain(KeyExplanation::button_B, "Back");
+    KeyExplanation::Explain(KeyExplanation::button_B, Tr("Back"));
     if (BoxGui::CancelPressed())
         BackButton::GoBack();
 }

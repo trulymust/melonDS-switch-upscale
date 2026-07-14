@@ -610,7 +610,9 @@ void Init()
     plInitialize(PlServiceType_User);
     PlFontData font;
 
-    plGetSharedFontByType(&font, PlSharedFontType_Standard);
+    Result fontRc = plGetSharedFontByType(&font, PlSharedFontType_ChineseSimplified);
+    if (R_FAILED(fontRc) || !font.address || font.size == 0)
+        plGetSharedFontByType(&font, PlSharedFontType_Standard);
     SystemFontStandardData = new u8[font.size];
     memcpy(SystemFontStandardData, font.address, font.size);
     SystemFontStandard = FontLoad(SystemFontStandardData);
