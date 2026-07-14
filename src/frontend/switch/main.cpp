@@ -256,11 +256,7 @@ void Init()
 {
     NDS::Init();
     GPU::InitRenderer(0);
-    int internalResolutionScale = Config::upscaleFactor + 1;
-    if (internalResolutionScale < 1)
-        internalResolutionScale = 1;
-    if (internalResolutionScale > 2)
-        internalResolutionScale = 2;
+    int internalResolutionScale = Config::InternalResolutionScale();
     GPU::RenderSettings settings{true, internalResolutionScale, false};
     GPU::SetRenderSettings(0, settings);
     GPU2D::DekoRenderer* renderer = (GPU2D::DekoRenderer*)GPU::GPU2D_Renderer.get();
@@ -269,7 +265,7 @@ void Init()
     {
         for (int i = 0; i < 2; i++)
         {
-            FramebufferTextures[j][i] = Gfx::TextureCreateExternal(renderer->GetFramebufferWidth(), renderer->GetFramebufferHeight(),
+            FramebufferTextures[j][i] = Gfx::TextureCreateExternal(renderer->GetFramebufferTextureWidth(), renderer->GetFramebufferTextureHeight(),
                 renderer->GetFramebuffer(j, i));
         }
     }

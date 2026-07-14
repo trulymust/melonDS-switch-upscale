@@ -94,7 +94,11 @@ void PalettisePixel(uint indexed, out uint rb, out uint g)
 void main()
 {
     ivec2 position = ivec2(gl_FragCoord.xy);
-    ivec2 nativePosition = FinalScale > 1U ? (position >> 1) : position;
+    ivec2 nativePosition = position;
+    if (FinalScale == 2U)
+        nativePosition = position >> 1;
+    else if (FinalScale == 4U)
+        nativePosition = position >> 2;
     uint finalColorRB, finalColorG;
 #ifdef ComposeBGOBJ
     // find out the two top most layers

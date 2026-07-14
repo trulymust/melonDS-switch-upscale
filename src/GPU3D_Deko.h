@@ -179,7 +179,7 @@ private:
 
     static const int NativeWidth = 256;
     static const int NativeHeight = 192;
-    static const int MaxRenderScale = 2;
+    static const int MaxRenderScale = 4;
     static const int MaxScreenWidth = NativeWidth * MaxRenderScale;
     static const int MaxScreenHeight = NativeHeight * MaxRenderScale;
 
@@ -189,7 +189,7 @@ private:
     static const int BinStride = 2048/32;
     static const int CoarseBinStride = BinStride/32;
 
-    static const int MaxWorkItemsPerTile = 24;
+    static const int MaxWorkItemsPerTile = 14;
     static const int MaxWorkTiles = MaxTilesPerLine*MaxTileLines*MaxWorkItemsPerTile;
     static const int MaxVariants = 256;
 

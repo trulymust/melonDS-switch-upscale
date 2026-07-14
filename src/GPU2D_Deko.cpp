@@ -1922,9 +1922,11 @@ void DekoRenderer::ComposeBGOBJ()
         }
         EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, shader});
 
-        DkViewport finalViewport = {0.f, 0.f, (float)FinalFramebufferWidth, (float)FinalFramebufferHeight, 0.f, 1.f};
+        u32 outputWidth = NativeWidth * _3DRenderScale;
+        u32 outputHeight = NativeHeight * _3DRenderScale;
+        DkViewport finalViewport = {0.f, 0.f, (float)outputWidth, (float)outputHeight, 0.f, 1.f};
         EmuCmdBuf.setViewports(0, {finalViewport, finalViewport});
-        DkScissor scissor = {0, firstLine * MaxRenderScale, FinalFramebufferWidth, region.LinesCount * MaxRenderScale};
+        DkScissor scissor = {0, firstLine * (u32)_3DRenderScale, outputWidth, region.LinesCount * (u32)_3DRenderScale};
         EmuCmdBuf.setScissors(0, {scissor, scissor});
         //printf("compositing region %d %d\n", firstLine, region.LinesCount);
 
@@ -2009,7 +2011,7 @@ void DekoRenderer::ComposeBGOBJ()
         composeUniform.EVB = region.EVB;
         composeUniform.EVY = region.EVY;
         composeUniform.RenderScale = _3DRenderScale;
-        composeUniform.FinalScale = MaxRenderScale;
+        composeUniform.FinalScale = _3DRenderScale;
         EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
             0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
             &composeUniform);

@@ -44,6 +44,10 @@ extern int hardcoreMode;
 
 extern int notification;
 
+void ClampInternalResolutionOption();
+int InternalResolutionScaleFromOption(int option);
+int InternalResolutionScale();
+
 }
 
 #endif

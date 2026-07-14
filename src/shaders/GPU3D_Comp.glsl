@@ -127,7 +127,7 @@ const int CoarseTileH = CoarseTileCountY * TileSize;
 
 const int NativeWidth = 256;
 const int NativeHeight = 192;
-const int MaxRenderScale = 2;
+const int MaxRenderScale = 4;
 const int MaxScreenWidth = NativeWidth * MaxRenderScale;
 const int MaxScreenHeight = NativeHeight * MaxRenderScale;
 const int MaxFramebufferStride = MaxScreenWidth*MaxScreenHeight;
@@ -137,7 +137,7 @@ const int MaxTileLines = MaxScreenHeight/TileSize;
 const int BinStride = 2048/32;
 const int CoarseBinStride = BinStride/32;
 
-const int MaxWorkItemsPerTile = 24;
+const int MaxWorkItemsPerTile = 14;
 const int MaxWorkTiles = MaxTilesPerLine*MaxTileLines*MaxWorkItemsPerTile;
 const int MaxVariants = 256;
 
@@ -1469,9 +1469,13 @@ void main()
     ivec2 highResPosition = ivec2(gl_GlobalInvocationID.xy);
     imageStore(FinalFBHiRes, highResPosition, uvec4(color.x, 0, 0, 0));
 
-    if (scale == 1 || ((highResPosition.x | highResPosition.y) & 1) == 0)
+    if (scale == 1 || ((highResPosition.x | highResPosition.y) & (scale - 1)) == 0)
     {
-        ivec2 nativePosition = scale == 1 ? highResPosition : (highResPosition >> 1);
+        ivec2 nativePosition = highResPosition;
+        if (scale == 2)
+            nativePosition = highResPosition >> 1;
+        else if (scale == 4)
+            nativePosition = highResPosition >> 2;
         imageStore(FinalFB, nativePosition, uvec4(color.x, 0, 0, 0));
     }
 }

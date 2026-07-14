@@ -43,6 +43,29 @@ int hardcoreMode = 0;
 
 int notification = 0;
 
+void ClampInternalResolutionOption()
+{
+    if (upscaleFactor < 0)
+        upscaleFactor = 0;
+    if (upscaleFactor > 2)
+        upscaleFactor = 2;
+}
+
+int InternalResolutionScaleFromOption(int option)
+{
+    if (option <= 0)
+        return 1;
+    if (option == 1)
+        return 2;
+    return 4;
+}
+
+int InternalResolutionScale()
+{
+    ClampInternalResolutionOption();
+    return InternalResolutionScaleFromOption(upscaleFactor);
+}
+
 ConfigEntry PlatformConfigFile[] =
 {
     {"GlobalRotation",          0, &GlobalRotation,         0, NULL, 0},

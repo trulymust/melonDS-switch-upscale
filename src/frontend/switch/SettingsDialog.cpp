@@ -752,18 +752,12 @@ void DoGui(BoxGui::Frame& parent)
             DoCheckbox(settingsFrame, settingsSkewer, "Integer scaling", integerScaling);
             Config::IntegerScaling = integerScaling;
             DoCombobox(settingsFrame, settingsSkewer, "Filtering", "Nearest\0Linear\0", Config::Filtering);
-            if (Config::upscaleFactor < 0)
-                Config::upscaleFactor = 0;
-            if (Config::upscaleFactor > 1)
-                Config::upscaleFactor = 1;
-            DoCombobox(settingsFrame, settingsSkewer, "3D internal resolution", "1x\0" "2x\0", Config::upscaleFactor);
-            if (Config::upscaleFactor < 0)
-                Config::upscaleFactor = 0;
-            if (Config::upscaleFactor > 1)
-                Config::upscaleFactor = 1;
+            Config::ClampInternalResolutionOption();
+            DoCombobox(settingsFrame, settingsSkewer, "3D internal resolution", "1x\0" "2x\0" "4x\0", Config::upscaleFactor);
+            Config::ClampInternalResolutionOption();
             if (Config::upscaleFactor != AppliedUpscaleFactor && Emulation::State != Emulation::emuState_Nothing)
             {
-                GPU::RenderSettings renderSettings{true, Config::upscaleFactor + 1, false};
+                GPU::RenderSettings renderSettings{true, Config::InternalResolutionScale(), false};
                 GPU::SetRenderSettings(0, renderSettings);
                 AppliedUpscaleFactor = Config::upscaleFactor;
             }

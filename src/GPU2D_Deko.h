@@ -28,13 +28,21 @@ public:
     {
         return FinalFramebuffers[front][num];
     }
-    u32 GetFramebufferWidth() const
+    u32 GetFramebufferTextureWidth() const
     {
         return FinalFramebufferWidth;
     }
-    u32 GetFramebufferHeight() const
+    u32 GetFramebufferTextureHeight() const
     {
         return FinalFramebufferHeight;
+    }
+    u32 GetFramebufferWidth() const
+    {
+        return NativeWidth * _3DRenderScale;
+    }
+    u32 GetFramebufferHeight() const
+    {
+        return NativeHeight * _3DRenderScale;
     }
     dk::Image& Get3DFramebuffer()
     {
@@ -54,7 +62,7 @@ public:
 private:
     static const u32 NativeWidth = 256;
     static const u32 NativeHeight = 192;
-    static const u32 MaxRenderScale = 2;
+    static const u32 MaxRenderScale = 4;
     static const u32 FinalFramebufferWidth = NativeWidth * MaxRenderScale;
     static const u32 FinalFramebufferHeight = NativeHeight * MaxRenderScale;
 
