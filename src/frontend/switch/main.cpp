@@ -256,7 +256,12 @@ void Init()
 {
     NDS::Init();
     GPU::InitRenderer(0);
-    GPU::RenderSettings settings{true, 1, false};
+    int internalResolutionScale = Config::upscaleFactor + 1;
+    if (internalResolutionScale < 1)
+        internalResolutionScale = 1;
+    if (internalResolutionScale > 2)
+        internalResolutionScale = 2;
+    GPU::RenderSettings settings{true, internalResolutionScale, false};
     GPU::SetRenderSettings(0, settings);
 
     for (int j = 0; j < 2; j++)

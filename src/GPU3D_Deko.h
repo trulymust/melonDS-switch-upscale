@@ -85,6 +85,10 @@ private:
         // only used/updated for rasteriation
         u32 CurVariant;
         float InvTextureSize[2];
+
+        u32 RenderWidth;
+        u32 RenderHeight;
+        u32 RenderScale;
     };
     GpuMemHeap::Allocation MetaUniformMemory;
     const int MetaUniformSize = (sizeof(MetaUniform) + DK_UNIFORM_BUF_ALIGNMENT - 1) & ~(DK_UNIFORM_BUF_ALIGNMENT - 1);
@@ -172,14 +176,26 @@ private:
     static const int CoarseTileW = CoarseTileCountX * TileSize;
     static const int CoarseTileH = CoarseTileCountY * TileSize;
 
-    static const int TilesPerLine = 256/TileSize;
-    static const int TileLines = 192/TileSize;
+    static const int NativeWidth = 256;
+    static const int NativeHeight = 192;
+    static const int MaxRenderScale = 2;
+    static const int MaxScreenWidth = NativeWidth * MaxRenderScale;
+    static const int MaxScreenHeight = NativeHeight * MaxRenderScale;
+
+    static const int MaxTilesPerLine = MaxScreenWidth/TileSize;
+    static const int MaxTileLines = MaxScreenHeight/TileSize;
 
     static const int BinStride = 2048/32;
     static const int CoarseBinStride = BinStride/32;
 
-    static const int MaxWorkTiles = TilesPerLine*TileLines*48;
+    static const int MaxWorkTiles = MaxTilesPerLine*MaxTileLines*48;
     static const int MaxVariants = 256;
+
+    int RenderScale = 1;
+    int ScreenWidth = NativeWidth;
+    int ScreenHeight = NativeHeight;
+    int TilesPerLine = NativeWidth/TileSize;
+    int TileLines = NativeHeight/TileSize;
 
     struct BinResult
     {
@@ -190,9 +206,9 @@ private:
         u32 UnsortedWorkDescs[MaxWorkTiles*2];
         u32 SortedWork[MaxWorkTiles*2];
 
-        u32 BinnedMaskCoarse[TilesPerLine*TileLines*CoarseBinStride];
-        u32 BinnedMask[TilesPerLine*TileLines*BinStride];
-        u32 WorkOffsets[TilesPerLine*TileLines*BinStride];
+        u32 BinnedMaskCoarse[MaxTilesPerLine*MaxTileLines*CoarseBinStride];
+        u32 BinnedMask[MaxTilesPerLine*MaxTileLines*BinStride];
+        u32 WorkOffsets[MaxTilesPerLine*MaxTileLines*BinStride];
     };
 
     struct Tiles
@@ -204,14 +220,14 @@ private:
 
     struct FinalTiles
     {
-        u32 ColorResult[256*192*2];
-        u32 DepthResult[256*192*2];
-        u32 AttrResult[256*192*2];
+        u32 ColorResult[MaxScreenWidth*MaxScreenHeight*2];
+        u32 DepthResult[MaxScreenWidth*MaxScreenHeight*2];
+        u32 AttrResult[MaxScreenWidth*MaxScreenHeight*2];
     };
 
     // eh those are pretty bad guesses
     // though real hw shouldn't be eable to render all 2048 polygons on every line either
-    static const int MaxYSpanIndices = 64*2048;
+    static const int MaxYSpanIndices = 64*2048*MaxRenderScale;
     static const int MaxYSpanSetups = 6144*2;
     SetupIndices YSpanIndices[MaxYSpanIndices];
     SpanSetupY YSpanSetups[MaxYSpanSetups];
@@ -255,8 +271,8 @@ private:
     TexCacheEntry& GetTexture(u32 textureParam, u32 paletteParam);
 
     void SetupAttrs(SpanSetupY* span, Polygon* poly, int from, int to);
-    void SetupYSpan(int polynum, SpanSetupY* span, Polygon* poly, int from, int to, u32 y, int side);
-    void SetupYSpanDummy(SpanSetupY* span, Polygon* poly, int vertex, int side);
+    void SetupYSpan(RenderPolygon* rp, SpanSetupY* span, Polygon* poly, int from, int to, int side, s32 positions[10][2]);
+    void SetupYSpanDummy(RenderPolygon* rp, SpanSetupY* span, Polygon* poly, int vertex, int side, s32 positions[10][2]);
 };
 
 }

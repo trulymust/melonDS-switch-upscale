@@ -125,14 +125,19 @@ const int CoarseTileCountY = 4;
 const int CoarseTileW = CoarseTileCountX * TileSize;
 const int CoarseTileH = CoarseTileCountY * TileSize;
 
-const int FramebufferStride = 256*192;
-const int TilesPerLine = 256/TileSize;
-const int TileLines = 192/TileSize;
+const int NativeWidth = 256;
+const int NativeHeight = 192;
+const int MaxRenderScale = 2;
+const int MaxScreenWidth = NativeWidth * MaxRenderScale;
+const int MaxScreenHeight = NativeHeight * MaxRenderScale;
+const int MaxFramebufferStride = MaxScreenWidth*MaxScreenHeight;
+const int MaxTilesPerLine = MaxScreenWidth/TileSize;
+const int MaxTileLines = MaxScreenHeight/TileSize;
 
 const int BinStride = 2048/32;
 const int CoarseBinStride = BinStride/32;
 
-const int MaxWorkTiles = TilesPerLine*TileLines*48;
+const int MaxWorkTiles = MaxTilesPerLine*MaxTileLines*48;
 const int MaxVariants = 256;
 
 layout (std430, binding = 3)
@@ -145,9 +150,9 @@ buffer BinResultBuffer
     uvec2 UnsortedWorkDescs[MaxWorkTiles];
     uvec2 SortedWork[MaxWorkTiles];
 
-    uint BinnedMaskCoarse[TilesPerLine*TileLines*CoarseBinStride];
-    uint BinnedMask[TilesPerLine*TileLines*BinStride];
-    uint WorkOffsets[TilesPerLine*TileLines*BinStride];
+    uint BinnedMaskCoarse[MaxTilesPerLine*MaxTileLines*CoarseBinStride];
+    uint BinnedMask[MaxTilesPerLine*MaxTileLines*BinStride];
+    uint WorkOffsets[MaxTilesPerLine*MaxTileLines*BinStride];
 };
 
 #if defined(Rasterise) || defined(DepthBlend)
@@ -175,9 +180,9 @@ readonly
 #endif
 buffer RasterResult
 {
-    uint ColorResult[256*192*2];
-    uint DepthResult[256*192*2];
-    uint AttrResult[256*192*2];
+    uint ColorResult[MaxFramebufferStride*2];
+    uint DepthResult[MaxFramebufferStride*2];
+    uint AttrResult[MaxFramebufferStride*2];
 };
 
 layout (std140, binding = 0) uniform MetaUniform
@@ -203,6 +208,10 @@ layout (std140, binding = 0) uniform MetaUniform
     // only used/updated for rasteriation
     uint CurVariant;
     vec2 InvTextureSize;
+
+    uint RenderWidth;
+    uint RenderHeight;
+    uint RenderScale;
 };
 
 
@@ -767,6 +776,7 @@ void main()
 {
     int groupIdx = int(gl_WorkGroupID.x);
     ivec2 coarseTile = ivec2(gl_WorkGroupID.yz);
+    int tilesPerLine = int(RenderWidth) / TileSize;
 
     int localIdx = int(gl_SubGroupInvocationARB);
 
@@ -800,7 +810,7 @@ void main()
             binnedMask |= 1U << bit;
     }
 
-    int linearTile = fineTile.x + fineTile.y * TilesPerLine + coarseTile.x * CoarseTileCountX + coarseTile.y * TilesPerLine * CoarseTileCountY;
+    int linearTile = fineTile.x + fineTile.y * tilesPerLine + coarseTile.x * CoarseTileCountX + coarseTile.y * tilesPerLine * CoarseTileCountY;
 
     BinnedMask[linearTile * BinStride + groupIdx] = binnedMask;
     int coarseMaskIdx = linearTile * CoarseBinStride + (groupIdx >> 5);
@@ -1257,7 +1267,9 @@ void ProcessCoarseMask(int linearTile, uint coarseMask, uint coarseOffset,
 
 void main()
 {
-    int linearTile = int(gl_WorkGroupID.x + (gl_WorkGroupID.y * TilesPerLine));
+    int tilesPerLine = int(RenderWidth) / TileSize;
+    int framebufferStride = int(RenderWidth * RenderHeight);
+    int linearTile = int(gl_WorkGroupID.x) + int(gl_WorkGroupID.y) * tilesPerLine;
 
     uint coarseMaskLo = BinnedMaskCoarse[linearTile*CoarseBinStride + 0];
     uint coarseMaskHi = BinnedMaskCoarse[linearTile*CoarseBinStride + 1];
@@ -1271,13 +1283,13 @@ void main()
     ProcessCoarseMask(linearTile, coarseMaskLo, 0, color, depth, attr, stencil, prevIsShadowMask);
     ProcessCoarseMask(linearTile, coarseMaskHi, BinStride/2, color, depth, attr, stencil, prevIsShadowMask);
 
-    int resultOffset = int(gl_GlobalInvocationID.x) + int(gl_GlobalInvocationID.y) * 256;
+    int resultOffset = int(gl_GlobalInvocationID.x) + int(gl_GlobalInvocationID.y) * int(RenderWidth);
     ColorResult[resultOffset] = color.x;
-    ColorResult[resultOffset+FramebufferStride] = color.y;
+    ColorResult[resultOffset+framebufferStride] = color.y;
     DepthResult[resultOffset] = depth.x;
-    DepthResult[resultOffset+FramebufferStride] = depth.y;
+    DepthResult[resultOffset+framebufferStride] = depth.y;
     AttrResult[resultOffset] = attr.x;
-    AttrResult[resultOffset+FramebufferStride] = attr.y;
+    AttrResult[resultOffset+framebufferStride] = attr.y;
 }
 
 #endif
@@ -1333,44 +1345,48 @@ uint BlendFog(uint color, uint depth)
 
 void main()
 {
-    int srcX = (int(gl_GlobalInvocationID.x) + XScroll) & 0x1FF;
-    int resultOffset = int(srcX) + int(gl_GlobalInvocationID.y) * 256;
+    int scale = int(RenderScale);
+    int nativeSrcX = (int(gl_GlobalInvocationID.x) + XScroll) & 0x1FF;
+    int srcX = nativeSrcX * scale;
+    int srcY = int(gl_GlobalInvocationID.y) * scale;
+    int framebufferStride = int(RenderWidth * RenderHeight);
+    int resultOffset = srcX + srcY * int(RenderWidth);
 
     uvec2 color = uvec2(0);
     uvec2 depth = uvec2(0);
     uvec2 attr = uvec2(0);
-    if (srcX < 256)
+    if (nativeSrcX < NativeWidth)
     {
-        color = uvec2(ColorResult[resultOffset], ColorResult[resultOffset+FramebufferStride]);
-        depth = uvec2(DepthResult[resultOffset], DepthResult[resultOffset+FramebufferStride]);
-        attr = uvec2(AttrResult[resultOffset], AttrResult[resultOffset+FramebufferStride]);
+        color = uvec2(ColorResult[resultOffset], ColorResult[resultOffset+framebufferStride]);
+        depth = uvec2(DepthResult[resultOffset], DepthResult[resultOffset+framebufferStride]);
+        attr = uvec2(AttrResult[resultOffset], AttrResult[resultOffset+framebufferStride]);
     }
 
 #ifdef EdgeMarking
-    if ((attr.x & 0xFU) != 0U)
+    if (nativeSrcX < NativeWidth && (attr.x & 0xFU) != 0U)
     {
         uvec4 otherAttr = uvec4(ClearAttr);
         uvec4 otherDepth = uvec4(ClearDepth);
 
-        if (srcX > 0U)
+        if (srcX > 0)
         {
-            otherAttr.x = AttrResult[resultOffset-1];
-            otherDepth.x = DepthResult[resultOffset-1];
+            otherAttr.x = AttrResult[resultOffset-scale];
+            otherDepth.x = DepthResult[resultOffset-scale];
         }
-        if (srcX < 255U)
+        if (srcX + scale < int(RenderWidth))
         {
-            otherAttr.y = AttrResult[resultOffset+1];
-            otherDepth.y = DepthResult[resultOffset+1];
+            otherAttr.y = AttrResult[resultOffset+scale];
+            otherDepth.y = DepthResult[resultOffset+scale];
         }
-        if (gl_GlobalInvocationID.y > 0U)
+        if (srcY > 0)
         {
-            otherAttr.z = AttrResult[resultOffset-256];
-            otherDepth.z = DepthResult[resultOffset-256];
+            otherAttr.z = AttrResult[resultOffset-int(RenderWidth)*scale];
+            otherDepth.z = DepthResult[resultOffset-int(RenderWidth)*scale];
         }
-        if (gl_GlobalInvocationID.y < 191U)
+        if (srcY + scale < int(RenderHeight))
         {
-            otherAttr.w = AttrResult[resultOffset+256];
-            otherDepth.w = DepthResult[resultOffset+256];
+            otherAttr.w = AttrResult[resultOffset+int(RenderWidth)*scale];
+            otherDepth.w = DepthResult[resultOffset+int(RenderWidth)*scale];
         }
 
         uint polyId = bitfieldExtract(attr.x, 24, 5);
