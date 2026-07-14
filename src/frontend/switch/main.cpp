@@ -754,12 +754,14 @@ void UpdateAndDraw(u64& keysDown, u64& keysUp)
         Gfx::WaitForFenceReady(renderer->FramebufferReady[GPU::FrontBuffer]);
         Gfx::SetSampler((Config::Filtering == 0 ? Gfx::sampler_Nearest : Gfx::sampler_Linear) | Gfx::sampler_ClampToEdge);
         Gfx::Vector2f sourceSize{(float)renderer->GetFramebufferWidth(), (float)renderer->GetFramebufferHeight()};
+        bool sharpFilter = Config::Filtering == 2;
         for (int i = 0; i < ScreensVisible; i++)
         {
-            Gfx::DrawRectangle(FramebufferTextures[GPU::FrontBuffer][ScreenKinds[i]], 
+            Gfx::DrawScreenRectangle(FramebufferTextures[GPU::FrontBuffer][ScreenKinds[i]],
                 ScreenPoints[i][0], ScreenPoints[i][1],
                 ScreenPoints[i][2], ScreenPoints[i][3],
-                {0.f, 0.f}, sourceSize);
+                {0.f, 0.f}, sourceSize,
+                sharpFilter);
         }
         
         Gfx::SignalFence(renderer->FramebufferPresented[GPU::FrontBuffer]);

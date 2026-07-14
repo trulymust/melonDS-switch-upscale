@@ -81,10 +81,17 @@ enum
     drawCallDirty_WaitFence = 1 << 4,
     drawCallDirty_SignalFence = 1 << 5,
 };
+
+enum
+{
+    drawShader_Default,
+    drawShader_ScreenSharp,
+};
+
 struct DrawCall
 {
     u32 Dirty;
-    u32 TextureIdx, Sampler;
+    u32 TextureIdx, Sampler, Shader;
     u32 Count;
     DkScissor Scissor;
     dk::Fence* Fence;
@@ -98,7 +105,7 @@ GpuMemHeap::Allocation UniformBuffer;
 GpuMemHeap::Allocation TextureStagingBuffer[2];
 u32 TextureStagingBufferOffset;
 
-dk::Shader VertexShader, FragmentShader;
+dk::Shader VertexShader, FragmentShader, ScreenSharpFragmentShader;
 
 NWindow* Window;
 
@@ -572,6 +579,7 @@ void Init()
 
     LoadShader("romfs:/shaders/Default_vsh.dksh", VertexShader);
     LoadShader("romfs:/shaders/Default_fsh.dksh", FragmentShader);
+    LoadShader("romfs:/shaders/ScreenSharp_fsh.dksh", ScreenSharpFragmentShader);
 
     for (int i = 0; i < 2; i++)
     {
@@ -851,7 +859,10 @@ void EndFrame(Color clearColor, int rotation)
             }
             if (drawCall.Dirty & drawCallDirty_Shader)
             {
-                PresentCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&VertexShader, &FragmentShader});
+                dk::Shader* fragmentShader = drawCall.Shader == drawShader_ScreenSharp
+                    ? &ScreenSharpFragmentShader
+                    : &FragmentShader;
+                PresentCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&VertexShader, fragmentShader});
             }
 
             PresentCmdBuf.drawIndexed(DkPrimitive_Triangles, drawCall.Count, 1, indexBufferOffset, 0, 0);
@@ -870,15 +881,15 @@ void EndFrame(Color clearColor, int rotation)
 
 void WaitForFenceReady(dk::Fence& fence)
 {
-    DrawCalls.push_back({drawCallDirty_WaitFence, 0, 0, 0, DkScissor(), &fence});
+    DrawCalls.push_back({drawCallDirty_WaitFence, 0, 0, drawShader_Default, 0, DkScissor(), &fence});
 }
 
 void SignalFence(dk::Fence& fence)
 {
-    DrawCalls.push_back({drawCallDirty_SignalFence, 0, 0, 0, DkScissor(), &fence});
+    DrawCalls.push_back({drawCallDirty_SignalFence, 0, 0, drawShader_Default, 0, DkScissor(), &fence});
 }
 
-void IssueDrawCall(u32 texture, u32 count)
+void IssueDrawCall(u32 texture, u32 count, u32 shader = drawShader_Default)
 {
     u32 dirty = 0;
     DkScissor& curScissor = ScissorStack[ScissorStack.size() - 1];
@@ -890,6 +901,8 @@ void IssueDrawCall(u32 texture, u32 count)
             dirty |= drawCallDirty_Texture;
         if (prevDrawCall.Sampler != CurSampler)
             dirty |= drawCallDirty_Sampler;
+        if (prevDrawCall.Shader != shader)
+            dirty |= drawCallDirty_Shader;
 
         if (prevDrawCall.Scissor.x != curScissor.x
             || prevDrawCall.Scissor.y != curScissor.y
@@ -900,7 +913,10 @@ void IssueDrawCall(u32 texture, u32 count)
         }
 
         if (prevDrawCall.Fence)
+        {
             lastWasFence = true;
+            dirty = ~(drawCallDirty_WaitFence|drawCallDirty_SignalFence);
+        }
     }
     else
     {
@@ -914,7 +930,7 @@ void IssueDrawCall(u32 texture, u32 count)
     }
 
     if (dirty || lastWasFence)
-        DrawCalls.push_back({dirty, texture, CurSampler, count, curScissor, nullptr});
+        DrawCalls.push_back({dirty, texture, CurSampler, shader, count, curScissor, nullptr});
     else
         DrawCalls[DrawCalls.size() - 1].Count += count;
 }
@@ -990,7 +1006,8 @@ void DrawRectangle(u32 texIdx, Vector2f position, Vector2f size, Vector2f subPos
 
 void DrawRectangle(u32 texIdx,
     Vector2f p0, Vector2f p1, Vector2f p2, Vector2f p3,
-    Vector2f subPosition, Vector2f subSize)
+    Vector2f subPosition, Vector2f subSize,
+    u32 shader)
 {
     Texture& texture = Textures[texIdx];
 
@@ -1012,10 +1029,26 @@ void DrawRectangle(u32 texIdx,
     IndexDataClient[CurClientIndex + 4] = CurClientVertex + 3;
     IndexDataClient[CurClientIndex + 5] = CurClientVertex + 1;
 
-    IssueDrawCall(texIdx, 6);
+    IssueDrawCall(texIdx, 6, shader);
 
     CurClientVertex += 4;
     CurClientIndex += 6;
+}
+
+void DrawRectangle(u32 texIdx,
+    Vector2f p0, Vector2f p1, Vector2f p2, Vector2f p3,
+    Vector2f subPosition, Vector2f subSize)
+{
+    DrawRectangle(texIdx, p0, p1, p2, p3, subPosition, subSize, drawShader_Default);
+}
+
+void DrawScreenRectangle(u32 texIdx,
+    Vector2f p0, Vector2f p1, Vector2f p2, Vector2f p3,
+    Vector2f subPosition, Vector2f subSize,
+    bool sharpFilter)
+{
+    DrawRectangle(texIdx, p0, p1, p2, p3, subPosition, subSize,
+        sharpFilter ? drawShader_ScreenSharp : drawShader_Default);
 }
 
 Vector2f MeasureText(u32 fontIdx, float size, const char* text)

@@ -751,7 +751,15 @@ void DoGui(BoxGui::Frame& parent)
             bool integerScaling = Config::IntegerScaling;
             DoCheckbox(settingsFrame, settingsSkewer, "Integer scaling", integerScaling);
             Config::IntegerScaling = integerScaling;
-            DoCombobox(settingsFrame, settingsSkewer, "Filtering", "Nearest\0Linear\0", Config::Filtering);
+            if (Config::Filtering < 0)
+                Config::Filtering = 0;
+            if (Config::Filtering > 2)
+                Config::Filtering = 2;
+            DoCombobox(settingsFrame, settingsSkewer, "Filtering", "Nearest\0Linear\0Sharp\0", Config::Filtering);
+            if (Config::Filtering < 0)
+                Config::Filtering = 0;
+            if (Config::Filtering > 2)
+                Config::Filtering = 2;
             Config::ClampInternalResolutionOption();
             DoCombobox(settingsFrame, settingsSkewer, "3D internal resolution", "1x\0" "2x\0" "4x\0", Config::upscaleFactor);
             Config::ClampInternalResolutionOption();

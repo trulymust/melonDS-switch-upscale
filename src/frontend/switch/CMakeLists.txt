@@ -100,6 +100,7 @@ configure_file(${CMAKE_SOURCE_DIR}/icon/melon_128x128.png ${CMAKE_BINARY_DIR}/ro
 
 compile_shader(vert Default_vsh)
 compile_shader(frag Default_fsh)
+compile_shader(frag ScreenSharp_fsh)
 
 compile_shader(vert ../../shaders/FullscreenQuad_vsh)
 compile_shader_instance(frag ../../shaders/ComposeBGOBJ_fsh ComposeBGOBJ_fsh "ComposeBGOBJ")

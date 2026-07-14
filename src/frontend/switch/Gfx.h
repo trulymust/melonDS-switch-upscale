@@ -207,6 +207,10 @@ void DrawRectangle(u32 texIdx,
 void DrawRectangle(u32 texIdx,
     Vector2f p0, Vector2f p1, Vector2f p2, Vector2f p3,
     Vector2f subPosition, Vector2f subSize);
+void DrawScreenRectangle(u32 texIdx,
+    Vector2f p0, Vector2f p1, Vector2f p2, Vector2f p3,
+    Vector2f subPosition, Vector2f subSize,
+    bool sharpFilter);
 
 enum
 {
