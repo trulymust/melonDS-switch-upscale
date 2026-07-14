@@ -36,6 +36,8 @@ int LimitFramerate;
 
 int ShowPerformanceMetrics;
 
+int EnableCheats = 1;
+
 char RetroAchievementsUsername[64] = "";
 char RetroAchievementsToken[64] = "";
 
@@ -87,6 +89,7 @@ ConfigEntry PlatformConfigFile[] =
     {"IntegerScaling",          0, &IntegerScaling,         0, NULL, 0},
     {"ScreenAspectTop",         0, &ScreenAspectTop,        0, NULL, 0},
     {"ScreenAspectBot",         0, &ScreenAspectBot,        0, NULL, 0},
+    {"EnableCheats",            0, &EnableCheats,           1, NULL, 0},
 
     {"LastROMPath0",            1, LastROMPath[0],          0, "",   511},
     {"LastROMPath1",            1, LastROMPath[1],          0, "",   511},

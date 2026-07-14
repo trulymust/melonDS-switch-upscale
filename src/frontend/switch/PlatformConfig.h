@@ -37,6 +37,8 @@ extern int LimitFramerate;
 
 extern int ShowPerformanceMetrics;
 
+extern int EnableCheats;
+
 extern char RetroAchievementsUsername[64];
 extern char RetroAchievementsToken[64];
 

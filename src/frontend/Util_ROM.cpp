@@ -868,4 +868,14 @@ void EnableCheats(bool enable)
         AREngine::SetCodeFile(CheatsOn ? CheatFile : nullptr);
 }
 
+ARCodeFile* GetCheatFile()
+{
+    return CheatFile;
+}
+
+bool SaveCheats()
+{
+    return CheatFile ? CheatFile->Save() : false;
+}
+
 }

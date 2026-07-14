@@ -10,11 +10,14 @@
 #include "GPU.h"
 #include "PlatformConfig.h"
 #include "InputConfig.h"
+#include "ARCodeFile.h"
+#include "../FrontendUtil.h"
 
 #include <string.h>
 
 #include "RetroAchievements.h"
 #include "NotificationSystem.h"
+#include "ErrorDialog.h"
 
 namespace {
     static u64 PlatformKeysHeld = 0;
@@ -122,6 +125,52 @@ void DoCheckbox(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name,
             {settingFrame.Area.Size.X - 2*10.f, 2.f},
             SeparatorColor);
     }
+}
+
+bool DoCheckboxWithId(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name, bool& value, int uniqueId, bool first = false)
+{
+    BoxGui::Frame settingFrame{parent, skewer.Spit({parent.Area.Size.X, UIRowHeight}, Gfx::align_Right),
+        {5.f, 5.f}, {5.f, 5.f}};
+
+    bool selected = BoxGui::InputElement(settingFrame, BoxGui::MakeUniqueName("settingsdialog_checkbox", uniqueId));
+    bool changed = false;
+    if (selected && BoxGui::ConfirmPressed())
+    {
+        value ^= true;
+        changed = true;
+    }
+    if (selected)
+    {
+        KeyExplanation::Explain(KeyExplanation::button_A, "Toggle");
+    }
+
+    Gfx::DrawRectangle(settingFrame.Area.Position - Gfx::Vector2f{0.f, 5.f}, settingFrame.Area.Size + Gfx::Vector2f{0.f, 5.f*2.f}, WidgetColorBright, true);
+
+    if (selected)
+        Gfx::DrawRectangle(settingFrame.Area.Position, settingFrame.Area.Size, WidgetColorVibrant);
+
+    BoxGui::Skewer settingSkewer{settingFrame, settingFrame.Area.Size.Y/2.f, BoxGui::direction_Horizontal};
+
+    settingSkewer.AlignLeft(15.f);
+    BoxGui::Frame nameFrame{settingFrame, settingSkewer.Spit({settingFrame.Area.Size.X*0.8f, TextLineHeight})};
+    Gfx::DrawText(Gfx::SystemFontStandard, nameFrame.Area.Position, TextLineHeight, DarkColor, "%s", name);
+
+    settingSkewer.AlignRight(25.f);
+    BoxGui::Frame checkMarkFrame{settingFrame, settingSkewer.Spit({TextLineHeight, TextLineHeight})};
+
+    Gfx::DrawText(Gfx::SystemFontNintendoExt,
+        checkMarkFrame.Area.Position, TextLineHeight,
+        DarkColor,
+        value ? GFX_NINTENDOFONT_CHECKMARK : GFX_NINTENDOFONT_CROSS);
+
+    if (!first)
+    {
+        Gfx::DrawRectangle(settingFrame.Area.Position + Gfx::Vector2f{10.f, -(5.f + 1.f)},
+            {settingFrame.Area.Size.X - 2*10.f, 2.f},
+            SeparatorColor);
+    }
+
+    return changed;
 }
 
 void DoCombobox(BoxGui::Frame& parent, BoxGui::Skewer& skewer, const char* name, const char* options, int& selectedOption, bool first = false)
@@ -790,6 +839,61 @@ void DoGui(BoxGui::Frame& parent)
                         ShowImage(settingsFrame, settingsSkewer, ach.textureId, ach.width, ach.height);
                 }
                 
+            }
+        }
+        break;
+    case uiScreen_Cheats:
+        title = "Cheats";
+        {
+            SectionHeader(settingsFrame, settingsSkewer, "Action Replay");
+
+            bool cheatsEnabled = Config::EnableCheats != 0;
+            bool oldCheatsEnabled = cheatsEnabled;
+            DoCheckbox(settingsFrame, settingsSkewer, "Enable cheats", cheatsEnabled, true);
+            if (cheatsEnabled != oldCheatsEnabled)
+            {
+                Config::EnableCheats = cheatsEnabled ? 1 : 0;
+                Frontend::EnableCheats(cheatsEnabled);
+            }
+
+            ARCodeFile* cheatFile = Frontend::GetCheatFile();
+            if (!cheatFile)
+            {
+                DoLabel(settingsFrame, settingsSkewer, "No game is loaded.");
+                DoLabel(settingsFrame, settingsSkewer, "Start a game before editing cheats.");
+                break;
+            }
+
+            if (cheatFile->Categories.empty())
+            {
+                DoLabel(settingsFrame, settingsSkewer, "No cheat codes found.");
+                DoLabel(settingsFrame, settingsSkewer, "Place a matching .mch file next to the ROM.");
+                break;
+            }
+
+            int uniqueId = 0;
+            for (ARCodeCatList::iterator catIt = cheatFile->Categories.begin(); catIt != cheatFile->Categories.end(); catIt++)
+            {
+                ARCodeCat& cat = *catIt;
+                SectionHeader(settingsFrame, settingsSkewer, cat.Name);
+
+                if (cat.Codes.empty())
+                {
+                    DoLabel(settingsFrame, settingsSkewer, "No codes in this category.");
+                    continue;
+                }
+
+                for (ARCodeList::iterator codeIt = cat.Codes.begin(); codeIt != cat.Codes.end(); codeIt++)
+                {
+                    ARCode& code = *codeIt;
+                    bool enabled = code.Enabled;
+                    if (DoCheckboxWithId(settingsFrame, settingsSkewer, code.Name, enabled, uniqueId++))
+                    {
+                        code.Enabled = enabled;
+                        if (!Frontend::SaveCheats())
+                            ErrorDialog::Open("Failed to save cheat file.");
+                    }
+                }
             }
         }
         break;

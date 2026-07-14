@@ -155,6 +155,10 @@ void DoGui(BoxGui::Frame& parent)
             {
                 CurrentUiScreen = uiScreen_RetroAchievements;   
             }
+            if (SideBarEntry(sideBarFrame, sideBarSkewer, "Cheats"))
+            {
+                CurrentUiScreen = uiScreen_Cheats;
+            }
             if (SideBarEntry(sideBarFrame, sideBarSkewer, "Display settings"))
             {
                 CurrentUiScreen = uiScreen_DisplaySettings;

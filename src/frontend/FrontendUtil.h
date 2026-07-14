@@ -23,6 +23,8 @@
 
 #include <vector>
 
+class ARCodeFile;
+
 namespace Frontend
 {
 
@@ -113,6 +115,8 @@ int ImportSRAM(const char* filename);
 
 // enable or disable cheats
 void EnableCheats(bool enable);
+ARCodeFile* GetCheatFile();
+bool SaveCheats();
 
 
 

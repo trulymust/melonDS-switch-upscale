@@ -880,8 +880,7 @@ void LoadROM(const char* file)
 
     load_game_from_file(file);
     
-    // TODO: add a setting to toggle on/off
-    Frontend::EnableCheats(true);
+    Frontend::EnableCheats(Config::EnableCheats != 0);
 }
 
 void LoadBIOS()
@@ -1108,6 +1107,7 @@ int main(int argc, const char* argv[])
         case uiScreen_DisplaySettings:
         case uiScreen_RetroAchievements:
         case uiScreen_InputSettings:
+        case uiScreen_Cheats:
             SettingsDialog::DoGui(rootFrame);
             break;
         }

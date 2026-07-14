@@ -9,6 +9,7 @@ enum
     uiScreen_DisplaySettings,
     uiScreen_InputSettings,
     uiScreen_RetroAchievements,
+    uiScreen_Cheats,
 };
 
 extern bool Done;
