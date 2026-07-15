@@ -1875,7 +1875,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         u32 unit = CurUnit->Num;
         DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
         EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
-        EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine, NativeWidth, (u32)linesCount}});
+        DkScissor objBatchScissor = {0, (u32)firstLine, NativeWidth, (u32)linesCount};
+        EmuCmdBuf.setScissors(0, {objBatchScissor});
 
         dk::ImageView objTarget{IntermedFramebuffers[fb_Count * unit + fb_OBJ]};
         EmuCmdBuf.bindRenderTargets({&objTarget});
@@ -1893,6 +1894,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             dk::ImageView objWindow{OBJWindow[unit]};
             EmuCmdBuf.bindRenderTargets({&objWindow});
             EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+            if (OBJWindowNeedsClear[unit])
+                EmuCmdBuf.setScissors(0, {objBatchScissor});
             BGOBJRedrawn[unit] |= (1 << 5);
             if (OBJWindowNeedsClear[unit] || (firstLine == 0 && linesCount == (s32)NativeHeight))
                 OBJWindowEmpty[unit] = true;
@@ -2328,6 +2331,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     {
         bool clearFullOBJWindow = OBJWindowNeedsClear[CurUnit->Num];
         dk::ImageView colorTarget{OBJWindow[CurUnit->Num]};
+        EmuCmdBuf.bindDepthStencilState(dk::DepthStencilState{});
         EmuCmdBuf.bindRenderTargets({&colorTarget});
         if (clearFullOBJWindow)
             EmuCmdBuf.setScissors(0, {DkScissor{0, 0, NativeWidth, NativeHeight}});
