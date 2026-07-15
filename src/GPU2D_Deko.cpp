@@ -1936,6 +1936,9 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
             assert(linesCount > 0);
             assert(firstLine != -1);
             int state = BGState[CurUnit->Num][i];
+            bool redrawsFullBGLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
+            bool canUseHiResBG = _3DRenderScale > 1
+                && ((BGHiResValid[CurUnit->Num] & (1U << i)) || redrawsFullBGLayer);
             if (state >= bgState_Text4bpp)
             {
                 BGOBJRedrawn[CurUnit->Num] |= (1 << i);
@@ -1989,7 +1992,7 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
 
                 drawBGAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_BG0 + i], 1);
 
-                if (_3DRenderScale > 1)
+                if (canUseHiResBG)
                 {
                     drawBGAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i], (u32)_3DRenderScale);
                     BGHiResValid[CurUnit->Num] |= 1U << i;
@@ -2017,7 +2020,7 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
                 };
 
                 clearBGAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_BG0 + i], 1);
-                if (_3DRenderScale > 1)
+                if (canUseHiResBG)
                 {
                     clearBGAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i], (u32)_3DRenderScale);
                     BGHiResValid[CurUnit->Num] |= 1U << i;
