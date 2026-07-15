@@ -2,6 +2,7 @@
 
 layout (binding = 0) uniform usamplerBuffer OBJVRAM8;
 layout (binding = 1) uniform usamplerBuffer OBJVRAM16;
+layout (binding = 2) uniform usampler2D MosaicTable;
 
 #cmakedefine OBJ4bpp
 #cmakedefine OBJ8bpp
@@ -9,7 +10,7 @@ layout (binding = 1) uniform usamplerBuffer OBJVRAM16;
 #cmakedefine OBJWindow
 
 layout (location = 0) in vec2 InInSpritePosition;
-layout (location = 1) flat in uvec3 InAddrInfo;
+layout (location = 1) flat in uvec4 InAddrInfo;
 layout (location = 2) flat in uvec2 InSize;
 
 layout (location = 0) out uint FinalColor;
@@ -23,6 +24,21 @@ layout (std140, binding = 0) uniform OBJUniform
 void main()
 {
     ivec2 inSpritePosition = ivec2(InInSpritePosition);
+    if ((InAddrInfo.w & (1U << 20)) != 0U)
+    {
+        int spriteY = int(InAddrInfo.w & 0xFFFFU);
+        if (spriteY >= 0x8000)
+            spriteY -= 0x10000;
+
+        uint mosaicLevel = (InAddrInfo.w >> 16) & 0xFU;
+        int screenY = int(gl_FragCoord.y);
+        int mosaicY = int(texelFetch(MosaicTable, ivec2(screenY, int(mosaicLevel)), 0).x);
+        int sourceY = mosaicY - spriteY;
+        if ((InAddrInfo.w & (1U << 21)) != 0U)
+            sourceY = int(InSize.y >> 8) - 1 - sourceY;
+
+        inSpritePosition.y = sourceY * 256;
+    }
 
     if (uint(inSpritePosition.x) >= InSize.x
         || uint(inSpritePosition.y) >= InSize.y)

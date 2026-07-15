@@ -1788,7 +1788,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     struct SpriteSpec
     {
         s16 X, Y, Width, Height;
-        u32 BaseAddr, StrideShift, Meta;
+        u32 BaseAddr, StrideShift, Meta, Mosaic;
         float Depth;
     };
 
@@ -2018,6 +2018,14 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             sprite.BaseAddr = addr;
             sprite.StrideShift = strideShift;
             sprite.Meta = meta;
+            sprite.Mosaic = 0;
+            if (spritemode != 2 && !isAffine && (attrib[0] & 0x1000) && objMosaicSizeY > 0)
+            {
+                sprite.Mosaic = ((u32)(u16)y)
+                    | ((u32)objMosaicSizeY << 16)
+                    | (1U << 20)
+                    | ((attrib[1] & 0x2000) ? (1U << 21) : 0);
+            }
             sprite.Depth = depthKey;
             //printf("%d %d %x %x %d %d %d %d %d\n", spriteKind, prio, sprite.BaseAddr, sprite.StrideShift, tilenum, sprite.X, sprite.Y, sprite.Width, sprite.Height);
 
@@ -2049,13 +2057,14 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         EmuCmdBuf.bindVtxAttribState(
         {
             DkVtxAttribState{0, 0, offsetof(SpriteSpec, X), DkVtxAttribSize_4x16, DkVtxAttribType_Sint, 0},
-            DkVtxAttribState{0, 0, offsetof(SpriteSpec, BaseAddr), DkVtxAttribSize_3x32, DkVtxAttribType_Uint, 0},
+            DkVtxAttribState{0, 0, offsetof(SpriteSpec, BaseAddr), DkVtxAttribSize_4x32, DkVtxAttribType_Uint, 0},
             DkVtxAttribState{0, 0, offsetof(SpriteSpec, Depth), DkVtxAttribSize_1x32, DkVtxAttribType_Float, 0},
         });
         EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
         {
             dkMakeTextureHandle(descriptorOffset_VRAM8 + textureVRAM_AOBJ + CurUnit->Num, 0),
             dkMakeTextureHandle(descriptorOffset_VRAM16 + textureVRAM_AOBJ + CurUnit->Num, 0),
+            dkMakeTextureHandle(descriptorOffset_MosaicTable, 0),
         });
 
         EmuCmdBuf.bindUniformBuffer(DkStage_Vertex, 0, Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize);
