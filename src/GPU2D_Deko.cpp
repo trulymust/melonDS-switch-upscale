@@ -542,7 +542,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
     }
 
     if (CurUnit->Num == 0 && CaptureLatch && (CaptureCnt & (1<<25)) && ((CaptureCnt >> 29) & 0x3) != 0)
-        memcpy(DispFIFOFramebuffer, CurUnit->DispFIFOBuffer, 256*2);
+        memcpy(&DispFIFOFramebuffer[n3dline*NativeWidth], CurUnit->DispFIFOBuffer, NativeWidth*2);
 
     /*if (CurUnit->Num == 0)
     {
@@ -808,6 +808,37 @@ void DekoRenderer::DoCapture()
 
     //printf("capturing %d %dx%d to %d (eva %d | evb %d) %p %p\n", source, width, height, dstvram, eva, evb, srcA, srcB);
 
+    auto copyCapturePixels = [&](u32& dstpos, u16* src, u32 srcpos, u32 count)
+    {
+        while (count > 0)
+        {
+            u32 dstLeft = 0x10000 - dstpos;
+            u32 srcLeft = 0x10000 - srcpos;
+            u32 copyAmount = count;
+            if (copyAmount > dstLeft) copyAmount = dstLeft;
+            if (copyAmount > srcLeft) copyAmount = srcLeft;
+
+            memcpy(&dst[dstpos], &src[srcpos], copyAmount*2);
+            dstpos = (dstpos + copyAmount) & 0xFFFF;
+            srcpos = (srcpos + copyAmount) & 0xFFFF;
+            count -= copyAmount;
+        }
+    };
+
+    auto clearCapturePixels = [&](u32& dstpos, u32 count)
+    {
+        while (count > 0)
+        {
+            u32 dstLeft = 0x10000 - dstpos;
+            u32 clearAmount = count;
+            if (clearAmount > dstLeft) clearAmount = dstLeft;
+
+            memset(&dst[dstpos], 0, clearAmount*2);
+            dstpos = (dstpos + clearAmount) & 0xFFFF;
+            count -= clearAmount;
+        }
+    };
+
     switch (source)
     {
     case 0: // source A
@@ -833,23 +864,13 @@ void DekoRenderer::DoCapture()
 
     case 1: // source B
         {
-            if (srcB)
+            for (u32 j = 0; j < height; j++)
             {
-                for (u32 i = 0; i < width*height; i += (1<<14))
-                {
-                    memcpy(&dst[dstaddr], &srcB[srcBaddr], (1<<14)*2);
-                    srcBaddr = (srcBaddr + (1<<14)) & 0xFFFF;
-                    dstaddr = (dstaddr + (1<<14)) & 0xFFFF;
-                }
-            }
-            else
-            {
-                for (u32 i = 0; i < width*height; i += (1<<14))
-                {
-                    memset(&dst[dstaddr], 0, (1<<14)*2);
-                    srcBaddr = (srcBaddr + (1<<14)) & 0xFFFF;
-                    dstaddr = (dstaddr + (1<<14)) & 0xFFFF;
-                }
+                u32 rowSrcBaddr = (srcBaddr + j*NativeWidth) & 0xFFFF;
+                if (srcB)
+                    copyCapturePixels(dstaddr, srcB, rowSrcBaddr, width);
+                else
+                    clearCapturePixels(dstaddr, width);
             }
         }
         break;
@@ -863,10 +884,11 @@ void DekoRenderer::DoCapture()
                 uint8x16_t evbMask = vdupq_n_u8(evb ? 0xFF : 0);
                 for (u32 j = 0; j < height; j++)
                 {
+                    u32 rowSrcBaddr = (srcBaddr + j*NativeWidth) & 0xFFFF;
                     for (u32 i = 0; i < width; i += 16)
                     {
                         uint8x16x4_t pixelsA = vld4q_u8(&srcA[(i + j * 256) * 4]);
-                        uint8x16x2_t pixelsB = vld2q_u8((u8*)&srcB[srcBaddr]);
+                        uint8x16x2_t pixelsB = vld2q_u8((u8*)&srcB[rowSrcBaddr]);
 
                         pixelsA.val[0] = vshrq_n_u8(pixelsA.val[0], 1);
                         pixelsA.val[1] = vshrq_n_u8(pixelsA.val[1], 1);
@@ -909,7 +931,7 @@ void DekoRenderer::DoCapture()
 
                         vst2q_u8((u8*)&dst[dstaddr], finalVal);
 
-                        srcBaddr = (srcBaddr + 16) & 0xFFFF;
+                        rowSrcBaddr = (rowSrcBaddr + 16) & 0xFFFF;
                         dstaddr = (dstaddr + 16) & 0xFFFF;
                     }
                 }
@@ -937,8 +959,8 @@ void DekoRenderer::DoCapture()
                         uint16x8_t finalBHi = vmull_high_u8(pixelsA.val[2], veva);
 
                         uint8x16_t finalR = vshrn_high_n_u16(vshrn_n_u16(finalRLo, 4), finalRHi, 4);
-                        uint8x16_t finalG = vshrn_high_n_u16(vshrn_n_u16(finalRLo, 4), finalGHi, 4);
-                        uint8x16_t finalB = vshrn_high_n_u16(vshrn_n_u16(finalRLo, 4), finalBHi, 4);
+                        uint8x16_t finalG = vshrn_high_n_u16(vshrn_n_u16(finalGLo, 4), finalGHi, 4);
+                        uint8x16_t finalB = vshrn_high_n_u16(vshrn_n_u16(finalBLo, 4), finalBHi, 4);
 
                         uint8x16_t alpha = vandq_u8(evaMask, vtstq_u8(pixelsA.val[3], pixelsA.val[3]));
 
