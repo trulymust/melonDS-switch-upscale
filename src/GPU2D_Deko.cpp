@@ -908,14 +908,16 @@ void DekoRenderer::DoCapture()
                     {
                         uint8x16x4_t pixelsA = vld4q_u8(&srcA[(i + j * 256) * 4]);
                         uint8x16x2_t pixelsB = vld2q_u8((u8*)&srcB[rowSrcBaddr]);
+                        uint8x16_t alphaA = vtstq_u8(pixelsA.val[3], pixelsA.val[3]);
+                        uint8x16_t alphaB = vtstq_u8(pixelsB.val[1], vdupq_n_u8(0x80));
 
-                        pixelsA.val[0] = vshrq_n_u8(pixelsA.val[0], 1);
-                        pixelsA.val[1] = vshrq_n_u8(pixelsA.val[1], 1);
-                        pixelsA.val[2] = vshrq_n_u8(pixelsA.val[2], 1);
+                        pixelsA.val[0] = vandq_u8(vshrq_n_u8(pixelsA.val[0], 1), alphaA);
+                        pixelsA.val[1] = vandq_u8(vshrq_n_u8(pixelsA.val[1], 1), alphaA);
+                        pixelsA.val[2] = vandq_u8(vshrq_n_u8(pixelsA.val[2], 1), alphaA);
 
-                        uint8x16_t redB = vandq_u8(pixelsB.val[0], vdupq_n_u8(0x1F));
-                        uint8x16_t greenB = vbslq_u8(vdupq_n_u8(0xE7), vshrq_n_u8(pixelsB.val[0], 5), vshlq_n_u8(pixelsB.val[1], 3));
-                        uint8x16_t blueB = vandq_u8(vshrq_n_u8(pixelsB.val[1], 2), vdupq_n_u8(0x1F));
+                        uint8x16_t redB = vandq_u8(vandq_u8(pixelsB.val[0], vdupq_n_u8(0x1F)), alphaB);
+                        uint8x16_t greenB = vandq_u8(vbslq_u8(vdupq_n_u8(0xE7), vshrq_n_u8(pixelsB.val[0], 5), vshlq_n_u8(pixelsB.val[1], 3)), alphaB);
+                        uint8x16_t blueB = vandq_u8(vandq_u8(vshrq_n_u8(pixelsB.val[1], 2), vdupq_n_u8(0x1F)), alphaB);
 
                         uint8x16_t veva = vdupq_n_u8(eva);
                         uint8x16_t vevb = vdupq_n_u8(evb);
@@ -941,8 +943,8 @@ void DekoRenderer::DoCapture()
                         uint8x16_t finalB = vminq_u8(vshrn_high_n_u16(vshrn_n_u16(finalBLo, 4), finalBHi, 4), vdupq_n_u8(0x1F));
 
                         uint8x16_t alpha = vorrq_u8(
-                            vandq_u8(evaMask, vtstq_u8(pixelsA.val[3], pixelsA.val[3])),
-                            vandq_u8(evbMask, vtstq_u8(pixelsB.val[1], vdupq_n_u8(0x80))));
+                            vandq_u8(evaMask, alphaA),
+                            vandq_u8(evbMask, alphaB));
 
                         uint8x16x2_t finalVal;
                         finalVal.val[0] = vorrq_u8(finalR, vshlq_n_u8(finalG, 5));
@@ -963,9 +965,10 @@ void DekoRenderer::DoCapture()
                     for (u32 i = 0; i < width; i += 16)
                     {
                         uint8x16x4_t pixelsA = vld4q_u8(&srcA[(i + j * 256) * 4]);
-                        pixelsA.val[0] = vshrq_n_u8(pixelsA.val[0], 1);
-                        pixelsA.val[1] = vshrq_n_u8(pixelsA.val[1], 1);
-                        pixelsA.val[2] = vshrq_n_u8(pixelsA.val[2], 1);
+                        uint8x16_t alphaA = vtstq_u8(pixelsA.val[3], pixelsA.val[3]);
+                        pixelsA.val[0] = vandq_u8(vshrq_n_u8(pixelsA.val[0], 1), alphaA);
+                        pixelsA.val[1] = vandq_u8(vshrq_n_u8(pixelsA.val[1], 1), alphaA);
+                        pixelsA.val[2] = vandq_u8(vshrq_n_u8(pixelsA.val[2], 1), alphaA);
 
                         uint8x16_t veva = vdupq_n_u8(eva);
 
@@ -981,7 +984,7 @@ void DekoRenderer::DoCapture()
                         uint8x16_t finalG = vshrn_high_n_u16(vshrn_n_u16(finalGLo, 4), finalGHi, 4);
                         uint8x16_t finalB = vshrn_high_n_u16(vshrn_n_u16(finalBLo, 4), finalBHi, 4);
 
-                        uint8x16_t alpha = vandq_u8(evaMask, vtstq_u8(pixelsA.val[3], pixelsA.val[3]));
+                        uint8x16_t alpha = vandq_u8(evaMask, alphaA);
 
                         uint8x16x2_t finalVal;
                         finalVal.val[0] = vorrq_u8(finalR, vshlq_n_u8(finalG, 5));
