@@ -671,7 +671,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             if (GPU::VRAMMap_LCDC & (1<<srcvram))
                 src = (u16*)GPU::VRAM[srcvram];
 
-            u32 srcBaddr = n3dline * NativeWidth;
+            u32 srcBaddr = line * NativeWidth;
             if (((dispCnt >> 16) & 0x3) != 2)
                 srcBaddr += ((CaptureCnt >> 26) & 0x3) << 14;
             srcBaddr &= 0xFFFF;
