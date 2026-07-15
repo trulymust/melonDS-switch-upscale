@@ -2373,11 +2373,13 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
             assert(linesCount > 0);
             assert(firstLine != -1);
             int state = BGState[CurUnit->Num][i];
+            bool bgMosaicFallback = (LastBGCnt[CurUnit->Num][i] & 0x0040)
+                && (LastBGMosaicSizeX[CurUnit->Num] > 0 || LastBGMosaicYMax[CurUnit->Num] > 0);
             bool redrawsFullBGLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
             bool bgHasHiResPath = state >= bgState_Affine;
             bool currentLinesHiRes = BGHiResLinesValid(CurUnit->Num, i, (u32)firstLine, (u32)linesCount);
-            bool canStartHiResBG = bgHasHiResPath;
-            bool canPreserveHiResBG = currentLinesHiRes && !redrawsFullBGLayer;
+            bool canStartHiResBG = bgHasHiResPath && !bgMosaicFallback;
+            bool canPreserveHiResBG = currentLinesHiRes && !redrawsFullBGLayer && !bgMosaicFallback;
             bool canUseHiResBG = _3DRenderScale > 1 && (canStartHiResBG || canPreserveHiResBG);
             if (state >= bgState_Text4bpp)
             {
