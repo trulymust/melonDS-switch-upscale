@@ -150,9 +150,11 @@ void DekoRenderer::Reset()
 void DekoRenderer::SetRenderSettings(GPU::RenderSettings& settings)
 {
     int newScale = settings.GL_ScaleFactor;
-    if (newScale < 1)
+    if (newScale <= 1)
         newScale = 1;
-    if (newScale > MaxRenderScale)
+    else if (newScale <= 2)
+        newScale = 2;
+    else
         newScale = MaxRenderScale;
 
     RenderScaleChanged |= RenderScale != newScale;

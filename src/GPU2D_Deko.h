@@ -54,7 +54,8 @@ public:
     }
     void Set3DRenderScale(int scale)
     {
-        int newScale = scale < 1 ? 1 : (scale > MaxRenderScale ? MaxRenderScale : scale);
+        // The compositor shaders keep explicit 1x/2x/4x coordinate paths.
+        int newScale = scale <= 1 ? 1 : (scale <= 2 ? 2 : MaxRenderScale);
         if (_3DRenderScale != newScale)
         {
             _3DRenderScale = newScale;
