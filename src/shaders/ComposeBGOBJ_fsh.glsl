@@ -265,6 +265,9 @@ void main()
 
     finalColorRB = ((color & 0x1FU) << 1) | ((color & 0x7C00) << 7);
     finalColorG = (color & 0x3E0U) >> 4;
+#ifdef ComposeBGOBJ
+    DisplayCapture = finalColorRB | (finalColorG << 8) | 0xFF000000U;
+#endif
 #endif
 
     if (MasterBrightnessMode == 1)
