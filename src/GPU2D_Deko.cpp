@@ -334,6 +334,7 @@ void DekoRenderer::Reset()
         LastForceBlank[i] = false;
         DirectBitmapNeeded[i] = false;
         LastBGMosaicSizeX[i] = 0;
+        LastBGMosaicSizeY[i] = 0;
         LastBGMosaicYMax[i] = 0;
         LastOBJMosaicSizeX[i] = 0;
         LastOBJMosaicSizeY[i] = 0;
@@ -560,7 +561,8 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             compositionDirty = true;
 
         bool mosaicChanged = LastBGMosaicYMax[num] != CurUnit->BGMosaicYMax
-            || LastBGMosaicSizeX[num] != CurUnit->BGMosaicSize[0];
+            || LastBGMosaicSizeX[num] != CurUnit->BGMosaicSize[0]
+            || LastBGMosaicSizeY[num] != CurUnit->BGMosaicSize[1];
         for (int i = 0; i < 4; i++)
         {
             if (((LastBGCnt[num][i] ^ CurUnit->BGCnt[i]) & 0xFFFC) || (LastBGCnt[num][i] & 0x0040 && mosaicChanged))
@@ -644,6 +646,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
         for (int i = 0; i < 4; i++)
             LastBGCnt[num][i] = CurUnit->BGCnt[i];
         LastBGMosaicSizeX[num] = CurUnit->BGMosaicSize[0];
+        LastBGMosaicSizeY[num] = CurUnit->BGMosaicSize[1];
         LastBGMosaicYMax[num] = CurUnit->BGMosaicYMax;
 
         if (compositionDirty)
@@ -2374,7 +2377,7 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
             assert(firstLine != -1);
             int state = BGState[CurUnit->Num][i];
             bool bgMosaicFallback = (LastBGCnt[CurUnit->Num][i] & 0x0040)
-                && (LastBGMosaicSizeX[CurUnit->Num] > 0 || LastBGMosaicYMax[CurUnit->Num] > 0);
+                && (LastBGMosaicSizeX[CurUnit->Num] > 0 || LastBGMosaicSizeY[CurUnit->Num] > 0);
             bool redrawsFullBGLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
             bool bgHasHiResPath = state >= bgState_Affine;
             bool currentLinesHiRes = BGHiResLinesValid(CurUnit->Num, i, (u32)firstLine, (u32)linesCount);
