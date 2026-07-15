@@ -546,8 +546,40 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
         }
     }
 
-    if (CurUnit->Num == 0 && CaptureLatch && (CaptureCnt & (1<<25)) && ((CaptureCnt >> 29) & 0x3) != 0)
-        memcpy(&DispFIFOFramebuffer[n3dline*NativeWidth], CurUnit->DispFIFOBuffer, NativeWidth*2);
+    if (CurUnit->Num == 0 && CaptureLatch && ((CaptureCnt >> 29) & 0x3) != 0)
+    {
+        u16* dst = &DisplayCaptureSourceB[n3dline*NativeWidth];
+        if (CaptureCnt & (1<<25))
+        {
+            memcpy(dst, CurUnit->DispFIFOBuffer, NativeWidth*2);
+        }
+        else
+        {
+            u16* src = NULL;
+            u32 srcvram = (DispCnt >> 18) & 0x3;
+            if (GPU::VRAMMap_LCDC & (1<<srcvram))
+                src = (u16*)GPU::VRAM[srcvram];
+
+            u32 srcBaddr = n3dline * NativeWidth;
+            if (((DispCnt >> 16) & 0x3) != 2)
+                srcBaddr += ((CaptureCnt >> 26) & 0x3) << 14;
+            srcBaddr &= 0xFFFF;
+
+            if (src)
+            {
+                u32 firstCopy = NativeWidth;
+                if (srcBaddr + firstCopy > 0x10000)
+                    firstCopy = 0x10000 - srcBaddr;
+                memcpy(dst, &src[srcBaddr], firstCopy*2);
+                if (firstCopy < NativeWidth)
+                    memcpy(&dst[firstCopy], src, (NativeWidth - firstCopy)*2);
+            }
+            else
+            {
+                memset(dst, 0, NativeWidth*2);
+            }
+        }
+    }
 
     /*if (CurUnit->Num == 0)
     {
@@ -775,23 +807,9 @@ void DekoRenderer::DoCapture()
 
     u8* srcA = Gfx::DataHeap->CpuAddr<u8>(DisplayCaptureMemory);
 
+    u32 source = (CaptureCnt >> 29) & 0x3;
     u32 srcBaddr = 0;
-    u16* srcB = NULL;
-
-    if (CaptureCnt & (1<<25))
-    {
-        srcB = DispFIFOFramebuffer;
-        srcBaddr = 0;
-    }
-    else
-    {
-        u32 srcvram = (DispCnt >> 18) & 0x3;
-        if (GPU::VRAMMap_LCDC & (1<<srcvram))
-            srcB = (u16*)GPU::VRAM[srcvram];
-
-        if (((DispCnt >> 16) & 0x3) != 2)
-            srcBaddr += ((CaptureCnt >> 26) & 0x3) << 14;
-    }
+    u16* srcB = source != 0 ? DisplayCaptureSourceB : NULL;
 
     dstaddr &= 0xFFFF;
     srcBaddr &= 0xFFFF;
@@ -824,8 +842,6 @@ void DekoRenderer::DoCapture()
 
     if (eva > 16) eva = 16;
     if (evb > 16) evb = 16;
-    u32 source = (CaptureCnt >> 29) & 0x3;
-
     if (source >= 2)
     {
         if (!srcB)
