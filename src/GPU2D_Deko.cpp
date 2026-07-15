@@ -516,12 +516,13 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             }
         }
     
+        bool outputForceBlankChanged = LastForceBlank[num] != forceblank;
         if (LastBlendCnt[num] != CurUnit->BlendCnt
             || LastMasterBrightness[num] != CurUnit->MasterBrightness
             || LastEVA[num] != CurUnit->EVA
             || LastEVB[num] != CurUnit->EVB
             || LastEVY[num] != CurUnit->EVY
-            || LastForceBlank[num] != forceblank)
+            || outputForceBlankChanged)
         {
             LastBlendCnt[num] = CurUnit->BlendCnt;
             LastMasterBrightness[num] = CurUnit->MasterBrightness;
@@ -531,6 +532,8 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             LastForceBlank[num] = forceblank;
             compositionDirty = true;
         }
+        if (outputForceBlankChanged)
+            bgmask = 0xF;
 
         // Bit 3 switches main-engine BG0 between 2D and 3D layer sources.
         if ((LastDispCnt[num] ^ CurUnit->DispCnt) & 0xFF030F8F)
@@ -751,7 +754,14 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
     }
 
     if (!forceblank)
+    {
         DrawScanline_BGOBJ(line, n3dline);
+    }
+    else
+    {
+        for (u32 i = 0; i < 4; i++)
+            BGState[num][i] = bgState_Disable;
+    }
 
     for (u32 i = 0; i < 4; i++)
     {
