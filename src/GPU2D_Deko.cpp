@@ -1916,7 +1916,8 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
                 BGOBJRedrawn[CurUnit->Num] |= (1 << i);
 
                 u32 mosaicLevel = LastBGCnt[CurUnit->Num][i] & 0x0040 ? LastBGMosaicSizeX[CurUnit->Num] : 0;
-                BGTextUniforms[CurUnit->Num][i].Text.MosaicLevel = mosaicLevel;
+                u32 batchEndLine = firstLine + linesCount;
+                BGTextUniforms[CurUnit->Num][i].Text.MosaicLevel = mosaicLevel | (batchEndLine << 8);
 
                 dk::Shader* shaders[] =
                 {

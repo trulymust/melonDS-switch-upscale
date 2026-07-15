@@ -25,6 +25,8 @@ void main()
     ivec2 position = ivec2(gl_FragCoord.xy);
     ivec2 nativePosition = position;
     int scale = max(int(RenderScale), 1);
+    uint mosaicLevel = MosaicLevel & 0xFFU;
+    int batchEndLine = int(MosaicLevel >> 8);
     int subY = 0;
 
     if (RenderScale == 2U)
@@ -39,7 +41,7 @@ void main()
     }
 
 #ifdef Mosaic
-    nativePosition.x = int(texelFetch(MosaicTable, ivec2(nativePosition.x, int(MosaicLevel)), 0).x);
+    nativePosition.x = int(texelFetch(MosaicTable, ivec2(nativePosition.x, int(mosaicLevel)), 0).x);
     position.x = nativePosition.x * scale;
 #endif
 
@@ -47,7 +49,7 @@ void main()
     ivec2 lineBase = perLineData.xy;
 
 #ifndef Mosaic
-    if (scale > 1 && nativePosition.y < 191)
+    if (scale > 1 && nativePosition.y < 191 && nativePosition.y + 1 < batchEndLine)
     {
         ivec2 nextLineBase = PerLineData[nativePosition.y + 1].xy;
         if (RenderScale == 2U)

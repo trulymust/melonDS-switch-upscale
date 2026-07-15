@@ -21,13 +21,14 @@ layout (std140, binding = 0) uniform BGUniform
 void main()
 {
     uvec2 position = uvec2(gl_FragCoord.xy);
+    uint mosaicLevel = MosaicLevel & 0xFFU;
     if (RenderScale == 2U)
         position >>= 1;
     else if (RenderScale == 4U)
         position >>= 2;
 
 #ifdef Mosaic
-    position.x = int(texelFetch(MosaicTable, ivec2(position.x, int(MosaicLevel)), 0).x);
+    position.x = int(texelFetch(MosaicTable, ivec2(position.x, int(mosaicLevel)), 0).x);
 #endif
 
     uvec4 perLineData = PerLineData[position.y];
