@@ -386,14 +386,14 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
         {
             bool originChanged = LastBGXRef[num][i] != CurUnit->BGXRef[i]
                 || LastBGYRef[num][i] != CurUnit->BGYRef[i];
+            bool matrixChanged = LastBGRotA[num][i] != CurUnit->BGRotA[i]
+                || LastBGRotB[num][i] != CurUnit->BGRotB[i]
+                || LastBGRotC[num][i] != CurUnit->BGRotC[i]
+                || LastBGRotD[num][i] != CurUnit->BGRotD[i];
 
-            AffineChangedMidframe[num][i] |= originChanged && n3dline > 0;
+            AffineChangedMidframe[num][i] |= (originChanged || matrixChanged) && n3dline > 0;
 
-            if (originChanged ||
-                LastBGRotA[num][i] != CurUnit->BGRotA[i] ||
-                LastBGRotB[num][i] != CurUnit->BGRotB[i] ||
-                LastBGRotC[num][i] != CurUnit->BGRotC[i] ||
-                LastBGRotD[num][i] != CurUnit->BGRotD[i])
+            if (originChanged || matrixChanged)
             {
                 LastBGXRef[num][i] = CurUnit->BGXRef[i];
                 LastBGYRef[num][i] = CurUnit->BGYRef[i];
@@ -1920,7 +1920,10 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
 
                 u32 mosaicLevel = LastBGCnt[CurUnit->Num][i] & 0x0040 ? LastBGMosaicSizeX[CurUnit->Num] : 0;
                 u32 batchEndLine = firstLine + linesCount;
-                BGTextUniforms[CurUnit->Num][i].Text.MosaicLevel = mosaicLevel | (batchEndLine << 8);
+                u32 disableAffineYInterpolation =
+                    (i >= 2 && AffineChangedMidframe[CurUnit->Num][i-2]) ? (1U << 16) : 0;
+                BGTextUniforms[CurUnit->Num][i].Text.MosaicLevel =
+                    mosaicLevel | (batchEndLine << 8) | disableAffineYInterpolation;
 
                 dk::Shader* shaders[] =
                 {
