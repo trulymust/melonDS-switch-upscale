@@ -62,6 +62,7 @@ public:
             {
                 BGHiResValid[unit] = 0;
                 OBJHiResValid[unit] = false;
+                OBJHiResFallback[unit] = false;
                 OBJBatchFirstLine[unit] = 0;
                 OBJBatchLinesCount[unit] = 0;
                 for (int bg = 0; bg < 4; bg++)
@@ -117,6 +118,7 @@ private:
     GpuMemHeap::Allocation IntermedFramebufferHiResMemory;
     u32 BGHiResValid[2] = {};
     bool OBJHiResValid[2] = {};
+    bool OBJHiResFallback[2] = {};
     dk::Image OBJDepth;
     GpuMemHeap::Allocation OBJDepthMemory;
     dk::Image OBJDepthHiRes;

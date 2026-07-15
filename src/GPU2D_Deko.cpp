@@ -321,6 +321,7 @@ void DekoRenderer::Reset()
         BGOBJRedrawn[i] = 0;
         BGHiResValid[i] = 0;
         OBJHiResValid[i] = false;
+        OBJHiResFallback[i] = false;
         OBJWindowEmpty[i] = true;
         ComposeRegions[i].clear();
 
@@ -1823,7 +1824,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     };
 
     drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1);
-    if (_3DRenderScale > 1 && !objMosaicFallback)
+    OBJHiResFallback[CurUnit->Num] |= objMosaicFallback;
+    if (_3DRenderScale > 1 && !OBJHiResFallback[CurUnit->Num])
     {
         drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale);
         OBJHiResValid[CurUnit->Num] = true;
@@ -2281,6 +2283,7 @@ void DekoRenderer::ComposeBGOBJ()
     }
 
     BGOBJRedrawn[CurUnit->Num] = 0;
+    OBJHiResFallback[CurUnit->Num] = false;
 
     if (CurUnit->Num == 0 && CaptureLatch)
     {
