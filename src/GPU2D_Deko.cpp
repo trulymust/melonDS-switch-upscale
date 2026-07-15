@@ -1547,6 +1547,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     int numSpritesTotal = 0;
     int numWindowSpritesTotal = 0;
     bool objMosaicFallback = false;
+    bool objHasHiResPath = false;
 
     OBJUniform uniform;
     uniform.VRAMMask = CurUnit->Num ? 0x1FFFF : 0x3FFFF;
@@ -1733,6 +1734,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         if (spritemode != 2 && (attrib[0] & 0x1000)
             && (objMosaicSizeX > 0 || objMosaicSizeY > 0))
             objMosaicFallback = true;
+        if (spritemode != 2 && isAffine)
+            objHasHiResPath = true;
 
         numSprites[spriteKind]++;
         numSpritesTotal++;
@@ -1834,7 +1837,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1);
     OBJHiResFallback[CurUnit->Num] |= objMosaicFallback;
     bool redrawsFullOBJLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
-    bool canUseHiResOBJ = _3DRenderScale > 1 && !OBJHiResFallback[CurUnit->Num]
+    bool canUseHiResOBJ = _3DRenderScale > 1 && objHasHiResPath && !OBJHiResFallback[CurUnit->Num]
         && (OBJHiResValid[CurUnit->Num] || redrawsFullOBJLayer);
     if (canUseHiResOBJ)
     {
