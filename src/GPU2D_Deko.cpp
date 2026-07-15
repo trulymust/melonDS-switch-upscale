@@ -1758,7 +1758,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     };
 
     drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1);
-    if (_3DRenderScale > 1 && numSpritesTotal - numWindowSpritesTotal > 0)
+    if (_3DRenderScale > 1)
     {
         drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale);
         OBJHiResValid[CurUnit->Num] = true;
@@ -1909,12 +1909,7 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
 
                 drawBGAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_BG0 + i], 1);
 
-                bool supportsHiRes = state == bgState_Affine
-                    || state == bgState_ExtendedBitmap8bpp
-                    || state == bgState_ExtendedBitmapDirect
-                    || state == bgState_ExtendedMixed;
-                bool drawHiRes = _3DRenderScale > 1 && supportsHiRes && mosaicLevel == 0;
-                if (drawHiRes)
+                if (_3DRenderScale > 1)
                 {
                     drawBGAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i], (u32)_3DRenderScale);
                     BGHiResValid[CurUnit->Num] |= 1U << i;
@@ -2172,14 +2167,12 @@ void DekoRenderer::ComposeBGOBJ()
                 dk::ImageView hiResColorTarget{IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i]};
                 EmuCmdBuf.bindRenderTargets({&hiResColorTarget});
                 EmuCmdBuf.discardColor(0);
-                BGHiResValid[CurUnit->Num] &= ~(1U << i);
             }
             else if (i == 4 && OBJHiResValid[CurUnit->Num])
             {
                 dk::ImageView hiResColorTarget{IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ]};
                 EmuCmdBuf.bindRenderTargets({&hiResColorTarget});
                 EmuCmdBuf.discardColor(0);
-                OBJHiResValid[CurUnit->Num] = false;
             }
         }
     }

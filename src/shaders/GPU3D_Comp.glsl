@@ -1466,18 +1466,38 @@ uint Resolve3DPixel(ivec2 highResPosition)
     return color.x;
 }
 
-void AccumulateNative3DSample(ivec2 highResPosition, inout uint sumR, inout uint sumG, inout uint sumB, inout uint sumA, inout uint colorWeight)
+void AccumulateNative3DSample(ivec2 highResPosition, inout uint sumR, inout uint sumG, inout uint sumB, inout uint sumA, inout uint coveredSamples)
 {
     uint color = Resolve3DPixel(highResPosition);
     uint alpha = (color >> 24) & 0x1FU;
     if (alpha == 0U)
         return;
 
-    sumR += (color & 0x3FU) * alpha;
-    sumG += ((color >> 8) & 0x3FU) * alpha;
-    sumB += ((color >> 16) & 0x3FU) * alpha;
+    sumR += color & 0x3FU;
+    sumG += (color >> 8) & 0x3FU;
+    sumB += (color >> 16) & 0x3FU;
     sumA += alpha;
-    colorWeight += alpha;
+    coveredSamples++;
+}
+
+uint AverageCoveredSamples(uint sum, uint coveredSamples)
+{
+    if (coveredSamples <= 1U) return sum;
+    if (coveredSamples == 2U) return (sum + 1U) / 2U;
+    if (coveredSamples == 3U) return (sum + 1U) / 3U;
+    if (coveredSamples == 4U) return (sum + 2U) / 4U;
+    if (coveredSamples == 5U) return (sum + 2U) / 5U;
+    if (coveredSamples == 6U) return (sum + 3U) / 6U;
+    if (coveredSamples == 7U) return (sum + 3U) / 7U;
+    if (coveredSamples == 8U) return (sum + 4U) / 8U;
+    if (coveredSamples == 9U) return (sum + 4U) / 9U;
+    if (coveredSamples == 10U) return (sum + 5U) / 10U;
+    if (coveredSamples == 11U) return (sum + 5U) / 11U;
+    if (coveredSamples == 12U) return (sum + 6U) / 12U;
+    if (coveredSamples == 13U) return (sum + 6U) / 13U;
+    if (coveredSamples == 14U) return (sum + 7U) / 14U;
+    if (coveredSamples == 15U) return (sum + 7U) / 15U;
+    return (sum + 8U) / 16U;
 }
 
 uint ResolveNative3DBlock(ivec2 nativePosition)
@@ -1491,52 +1511,52 @@ uint ResolveNative3DBlock(ivec2 nativePosition)
     uint sumG = 0U;
     uint sumB = 0U;
     uint sumA = 0U;
-    uint colorWeight = 0U;
-    uint sampleCount = 1U;
+    uint coveredSamples = 0U;
+    uint resolvedA = 0U;
 
     if (scale == 2)
     {
-        sampleCount = 4U;
-        AccumulateNative3DSample(highResBase + ivec2(0, 0), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(1, 0), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(0, 1), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(1, 1), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(0, 0), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(1, 0), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(0, 1), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(1, 1), sumR, sumG, sumB, sumA, coveredSamples);
+        resolvedA = min((sumA + 2U) / 4U, 31U);
     }
     else if (scale == 4)
     {
-        sampleCount = 16U;
-        AccumulateNative3DSample(highResBase + ivec2(0, 0), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(1, 0), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(2, 0), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(3, 0), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(0, 1), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(1, 1), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(2, 1), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(3, 1), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(0, 2), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(1, 2), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(2, 2), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(3, 2), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(0, 3), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(1, 3), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(2, 3), sumR, sumG, sumB, sumA, colorWeight);
-        AccumulateNative3DSample(highResBase + ivec2(3, 3), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(0, 0), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(1, 0), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(2, 0), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(3, 0), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(0, 1), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(1, 1), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(2, 1), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(3, 1), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(0, 2), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(1, 2), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(2, 2), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(3, 2), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(0, 3), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(1, 3), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(2, 3), sumR, sumG, sumB, sumA, coveredSamples);
+        AccumulateNative3DSample(highResBase + ivec2(3, 3), sumR, sumG, sumB, sumA, coveredSamples);
+        resolvedA = min((sumA + 8U) / 16U, 31U);
     }
     else
     {
-        AccumulateNative3DSample(highResBase, sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase, sumR, sumG, sumB, sumA, coveredSamples);
+        resolvedA = min(sumA, 31U);
     }
 
-    if (colorWeight == 0U)
+    if (coveredSamples == 0U)
         return 0U;
 
-    uint resolvedA = min((sumA + sampleCount / 2U) / sampleCount, 31U);
     if (resolvedA == 0U)
         return 0U;
 
-    uint resolvedR = min((sumR + colorWeight / 2U) / colorWeight, 63U);
-    uint resolvedG = min((sumG + colorWeight / 2U) / colorWeight, 63U);
-    uint resolvedB = min((sumB + colorWeight / 2U) / colorWeight, 63U);
+    uint resolvedR = min(AverageCoveredSamples(sumR, coveredSamples), 63U);
+    uint resolvedG = min(AverageCoveredSamples(sumG, coveredSamples), 63U);
+    uint resolvedB = min(AverageCoveredSamples(sumB, coveredSamples), 63U);
 
     return 0x40000000U | (resolvedA << 24) | resolvedR | (resolvedG << 8) | (resolvedB << 16);
 }
