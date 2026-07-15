@@ -125,6 +125,9 @@ void DekoRenderer::DeInit()
 
 void DekoRenderer::Reset()
 {
+    RenderScaleChanged = true;
+    LastRenderedXPos = 0;
+
     for (u32 i = 0; i < 8; i++)
     {
         for (u32 j = 0; j < 8; j++)
@@ -146,11 +149,14 @@ void DekoRenderer::Reset()
 
 void DekoRenderer::SetRenderSettings(GPU::RenderSettings& settings)
 {
-    RenderScale = settings.GL_ScaleFactor;
-    if (RenderScale < 1)
-        RenderScale = 1;
-    if (RenderScale > MaxRenderScale)
-        RenderScale = MaxRenderScale;
+    int newScale = settings.GL_ScaleFactor;
+    if (newScale < 1)
+        newScale = 1;
+    if (newScale > MaxRenderScale)
+        newScale = MaxRenderScale;
+
+    RenderScaleChanged |= RenderScale != newScale;
+    RenderScale = newScale;
 
     ScreenWidth = NativeWidth * RenderScale;
     ScreenHeight = NativeHeight * RenderScale;
@@ -942,7 +948,7 @@ void DekoRenderer::RenderFrame()
             it = TexCache.erase(it);
         }
     }
-    else if (RenderFrameIdentical)
+    else if (RenderFrameIdentical && !RenderScaleChanged && LastRenderedXPos == RenderXPos)
     {
         return;
     }
@@ -1397,6 +1403,8 @@ void DekoRenderer::RenderFrame()
     EmuCmdBuf.bindShaders(DkStageFlag_Compute, {&ShaderFinalPass[finalPassShader]});
     EmuCmdBuf.dispatchCompute(ScreenWidth/32, ScreenHeight, 1);
     EmuCmdBuf.barrier(DkBarrier_Primitives, 0);
+    RenderScaleChanged = false;
+    LastRenderedXPos = RenderXPos;
 
     DkCmdList cmdlist = CmdMem.End(EmuCmdBuf);
     EmuQueue.submitCommands(cmdlist);

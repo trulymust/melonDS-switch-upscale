@@ -198,6 +198,8 @@ private:
     int ScreenHeight = NativeHeight;
     int TilesPerLine = NativeWidth/TileSize;
     int TileLines = NativeHeight/TileSize;
+    bool RenderScaleChanged = true;
+    u16 LastRenderedXPos = 0;
 
     struct BinResult
     {
