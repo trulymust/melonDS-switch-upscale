@@ -1517,6 +1517,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
     u16* oam = (u16*)&OAMShadow[CurUnit->Num ? 0x400 : 0];
     u32 objDispCnt = LastOBJDispCnt[CurUnit->Num];
+    u8 objMosaicSizeX = LastOBJMosaicSizeX[CurUnit->Num];
+    u8 objMosaicSizeY = LastOBJMosaicSizeY[CurUnit->Num];
 
     enum
     {
@@ -1729,7 +1731,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             continue;
 
         if (spritemode != 2 && (attrib[0] & 0x1000)
-            && (CurUnit->OBJMosaicSize[0] > 0 || CurUnit->OBJMosaicSize[1] > 0))
+            && (objMosaicSizeX > 0 || objMosaicSizeY > 0))
             objMosaicFallback = true;
 
         numSprites[spriteKind]++;
