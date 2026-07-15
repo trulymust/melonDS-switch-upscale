@@ -1815,8 +1815,10 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     constexpr u32 objMosaicSizeYShift = 9;
     constexpr u32 objMosaicVFlip = 1U << 13;
     constexpr u32 objMosaicYEnable = 1U << 14;
+    constexpr u32 objMosaicAffineY = 1U << 15;
     constexpr u32 objMosaicSpriteIDShift = 16;
     constexpr u32 objMosaicPostXEnable = 1U << 24;
+    constexpr u32 objMosaicAffineParamShift = 25;
 
     auto packMosaicCoord = [](s32 coord)
     {
@@ -2057,12 +2059,20 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             {
                 if (objMosaicSizeX > 0)
                     sprite.Mosaic |= objMosaicPostXEnable;
-                if (!isAffine && objMosaicSizeY > 0)
+                if (objMosaicSizeY > 0)
                 {
                     sprite.Mosaic |= objMosaicYEnable
-                        | (packMosaicCoord(y) << objMosaicYShift)
-                        | ((u32)objMosaicSizeY << objMosaicSizeYShift)
-                        | ((attrib[1] & 0x2000) ? objMosaicVFlip : 0);
+                        | ((u32)objMosaicSizeY << objMosaicSizeYShift);
+                    if (isAffine)
+                    {
+                        sprite.Mosaic |= objMosaicAffineY
+                            | (((attrib[1] >> 9) & 0x1F) << objMosaicAffineParamShift);
+                    }
+                    else
+                    {
+                        sprite.Mosaic |= (packMosaicCoord(y) << objMosaicYShift)
+                            | ((attrib[1] & 0x2000) ? objMosaicVFlip : 0);
+                    }
                 }
             }
             sprite.Depth = depthKey;

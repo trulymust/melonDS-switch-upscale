@@ -29,8 +29,10 @@ const uint OBJMosaicYShift = 0U;
 const uint OBJMosaicSizeYShift = 9U;
 const uint OBJMosaicVFlip = 1U << 13U;
 const uint OBJMosaicYEnable = 1U << 14U;
+const uint OBJMosaicAffineY = 1U << 15U;
 const uint OBJMosaicSpriteIDShift = 16U;
 const uint OBJMosaicPostXEnable = 1U << 24U;
+const uint OBJMosaicAffineParamShift = 25U;
 
 int DecodeMosaicCoord(uint value)
 {
@@ -42,19 +44,30 @@ int DecodeMosaicCoord(uint value)
 
 void main()
 {
-    ivec2 inSpritePosition = ivec2(InInSpritePosition);
+    vec2 spritePosition = InInSpritePosition;
     if ((InAddrInfo.w & OBJMosaicYEnable) != 0U)
     {
         uint mosaicLevelY = (InAddrInfo.w >> OBJMosaicSizeYShift) & 0xFU;
-        int spriteY = DecodeMosaicCoord(InAddrInfo.w >> OBJMosaicYShift);
         int screenY = int(gl_FragCoord.y);
         int mosaicY = int(texelFetch(MosaicTable, ivec2(screenY, int(mosaicLevelY)), 0).x);
-        int sourceY = mosaicY - spriteY;
-        if ((InAddrInfo.w & OBJMosaicVFlip) != 0U)
-            sourceY = int(InSize.y >> 8) - 1 - sourceY;
 
-        inSpritePosition.y = sourceY * 256;
+        if ((InAddrInfo.w & OBJMosaicAffineY) != 0U)
+        {
+            uint affineParam = (InAddrInfo.w >> OBJMosaicAffineParamShift) & 0x1FU;
+            int deltaY = screenY - mosaicY;
+            spritePosition -= AffineTransforms[affineParam].yw * float(deltaY) * 256.0;
+        }
+        else
+        {
+            int spriteY = DecodeMosaicCoord(InAddrInfo.w >> OBJMosaicYShift);
+            int sourceY = mosaicY - spriteY;
+            if ((InAddrInfo.w & OBJMosaicVFlip) != 0U)
+                sourceY = int(InSize.y >> 8) - 1 - sourceY;
+
+            spritePosition.y = float(sourceY * 256);
+        }
     }
+    ivec2 inSpritePosition = ivec2(spritePosition);
 
     if (uint(inSpritePosition.x) >= InSize.x
         || uint(inSpritePosition.y) >= InSize.y)
