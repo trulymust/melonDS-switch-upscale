@@ -2298,6 +2298,8 @@ void DekoRenderer::ComposeBGOBJ()
 
         if (capture)
         {
+            EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, &ShaderComposeBGOBJ});
+
             DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
             EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
             DkScissor nativeScissor = {0, firstLine, NativeWidth, region.LinesCount};
