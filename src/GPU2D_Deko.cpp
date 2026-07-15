@@ -846,8 +846,8 @@ void DekoRenderer::DrawSprites(u32 line, Unit* unit)
         GPU::OAMDirty &= ~(1 << num);
     }
 
-    // OBJ address and palette mode bits affect the generated sprite layer.
-    const u32 objDispCntMask = 0x80700070;
+    // OBJ enable, address, and palette mode bits affect the generated sprite layer.
+    const u32 objDispCntMask = 0x80701070;
     bool objFmtChanged = (LastOBJDispCnt[num] ^ CurUnit->DispCnt) & objDispCntMask;
     bool objMosaicChanged = LastOBJMosaicSizeX[num] != CurUnit->OBJMosaicSize[0]
         || LastOBJMosaicSizeY[num] != CurUnit->OBJMosaicSize[1];
@@ -1799,6 +1799,38 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     int numWindowSpritesTotal = 0;
     bool objMosaicFallback = false;
     bool objHasHiResPath = false;
+
+    if ((objDispCnt & (1<<12)) == 0)
+    {
+        u32 unit = CurUnit->Num;
+        DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
+        EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
+        EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine, NativeWidth, (u32)linesCount}});
+
+        dk::ImageView objTarget{IntermedFramebuffers[fb_Count * unit + fb_OBJ]};
+        EmuCmdBuf.bindRenderTargets({&objTarget});
+        EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+        SetOBJHiResLines(unit, (u32)firstLine, (u32)linesCount, false);
+        BGOBJRedrawn[unit] |= (1 << 4);
+
+        if (!OBJWindowEmpty[unit])
+        {
+            dk::ImageView objWindow{OBJWindow[unit]};
+            EmuCmdBuf.bindRenderTargets({&objWindow});
+            EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+            BGOBJRedrawn[unit] |= (1 << 5);
+            if (firstLine == 0 && linesCount == (s32)NativeHeight)
+                OBJWindowEmpty[unit] = true;
+        }
+
+        EmuCmdBuf.barrier(DkBarrier_Fragments, DkInvalidateFlags_Image);
+
+        OBJBatchFirstLine[unit] += OBJBatchLinesCount[unit];
+        OBJBatchLinesCount[unit] = 0;
+        if ((u32)curline < NativeHeight)
+            OBJCompositionDirty[unit] = true;
+        return;
+    }
 
     OBJUniform uniform;
     uniform.VRAMMask = CurUnit->Num ? 0x1FFFF : 0x3FFFF;
