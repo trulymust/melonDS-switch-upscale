@@ -63,9 +63,10 @@ public:
             {
                 BGHiResValid[unit] = 0;
                 OBJHiResValid[unit] = false;
-                OBJHiResFallback[unit] = false;
                 OBJBatchFirstLine[unit] = 0;
                 OBJBatchLinesCount[unit] = 0;
+                ClearOBJHiResLines(unit);
+                OBJCompositionDirty[unit] = false;
                 for (int bg = 0; bg < 4; bg++)
                 {
                     ClearBGHiResLines(unit, bg);
@@ -124,7 +125,7 @@ private:
     u32 BGHiResValid[2] = {};
     u64 BGHiResLineValid[2][4][HiResLineValidWords] = {};
     bool OBJHiResValid[2] = {};
-    bool OBJHiResFallback[2] = {};
+    u64 OBJHiResLineValid[2][HiResLineValidWords] = {};
     dk::Image OBJDepth;
     GpuMemHeap::Allocation OBJDepthMemory;
     dk::Image OBJDepthHiRes;
@@ -297,6 +298,9 @@ private:
     void ClearBGHiResLines(u32 unit, u32 bg);
     void SetBGHiResLines(u32 unit, u32 bg, u32 firstLine, u32 linesCount, bool valid);
     bool BGHiResLinesValid(u32 unit, u32 bg, u32 firstLine, u32 linesCount) const;
+    void ClearOBJHiResLines(u32 unit);
+    void SetOBJHiResLines(u32 unit, u32 firstLine, u32 linesCount, bool valid);
+    bool OBJHiResLinesValid(u32 unit, u32 firstLine, u32 linesCount) const;
 
 
     bool CmdBufOpen = false;
@@ -306,6 +310,7 @@ private:
     u8 BGOBJRedrawn[2] = {0};
 
     bool OBJWindowEmpty[2] = {true, true};
+    bool OBJCompositionDirty[2] = {};
 
     bool CaptureLatch = false;
     u32 CaptureCnt = 0;

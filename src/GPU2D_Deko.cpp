@@ -322,7 +322,8 @@ void DekoRenderer::Reset()
         BGOBJRedrawn[i] = 0;
         BGHiResValid[i] = 0;
         OBJHiResValid[i] = false;
-        OBJHiResFallback[i] = false;
+        ClearOBJHiResLines(i);
+        OBJCompositionDirty[i] = false;
         OBJWindowEmpty[i] = true;
         ComposeRegions[i].clear();
 
@@ -408,6 +409,55 @@ bool DekoRenderer::BGHiResLinesValid(u32 unit, u32 bg, u32 firstLine, u32 linesC
     return true;
 }
 
+void DekoRenderer::ClearOBJHiResLines(u32 unit)
+{
+    memset(OBJHiResLineValid[unit], 0, sizeof(OBJHiResLineValid[unit]));
+    OBJHiResValid[unit] = false;
+}
+
+void DekoRenderer::SetOBJHiResLines(u32 unit, u32 firstLine, u32 linesCount, bool valid)
+{
+    if (firstLine >= NativeHeight || linesCount == 0)
+        return;
+
+    if (firstLine + linesCount > NativeHeight)
+        linesCount = NativeHeight - firstLine;
+
+    for (u32 line = firstLine; line < firstLine + linesCount; line++)
+    {
+        u64 bit = 1ULL << (line & 63);
+        u64& word = OBJHiResLineValid[unit][line >> 6];
+        if (valid)
+            word |= bit;
+        else
+            word &= ~bit;
+    }
+
+    bool anyValid = false;
+    for (u32 word = 0; word < HiResLineValidWords; word++)
+        anyValid |= OBJHiResLineValid[unit][word] != 0;
+
+    OBJHiResValid[unit] = anyValid;
+}
+
+bool DekoRenderer::OBJHiResLinesValid(u32 unit, u32 firstLine, u32 linesCount) const
+{
+    if (!OBJHiResValid[unit] || firstLine >= NativeHeight || linesCount == 0)
+        return false;
+
+    if (firstLine + linesCount > NativeHeight)
+        return false;
+
+    for (u32 line = firstLine; line < firstLine + linesCount; line++)
+    {
+        u64 bit = 1ULL << (line & 63);
+        if ((OBJHiResLineValid[unit][line >> 6] & bit) == 0)
+            return false;
+    }
+
+    return true;
+}
+
 void DekoRenderer::DrawScanline(u32 line, Unit* unit)
 {
     CurUnit = unit;
@@ -427,7 +477,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
     bool uploadBarrier = false;
     {
         u32 bgmask = 0;
-        bool compositionDirty = n3dline == 0;
+        bool compositionDirty = n3dline == 0 || OBJCompositionDirty[num];
         ComposeRegion composeRegion = {0};
 
         for (int i = 0; i < 4; i++)
@@ -586,6 +636,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             composeRegion.EVB = CurUnit->EVB;
             composeRegion.EVY = CurUnit->EVY;
             ComposeRegions[num].push_back(composeRegion);
+            OBJCompositionDirty[num] = false;
         }
     }
 
@@ -1658,6 +1709,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         //printf("skipping obj\n");
         OBJBatchFirstLine[CurUnit->Num] = curline;
         OBJBatchLinesCount[CurUnit->Num] = 0;
+        if (curline < NativeHeight)
+            OBJCompositionDirty[CurUnit->Num] = true;
         return;
     }
 
@@ -1984,20 +2037,20 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     };
 
     drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1);
-    OBJHiResFallback[CurUnit->Num] |= objMosaicFallback;
     bool redrawsFullOBJLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
-    bool canStartHiResOBJ = objHasHiResPath && redrawsFullOBJLayer;
-    bool canPreserveHiResOBJ = OBJHiResValid[CurUnit->Num] && !redrawsFullOBJLayer;
-    bool canUseHiResOBJ = _3DRenderScale > 1 && !OBJHiResFallback[CurUnit->Num]
+    bool currentLinesHiRes = OBJHiResLinesValid(CurUnit->Num, (u32)firstLine, (u32)linesCount);
+    bool canStartHiResOBJ = objHasHiResPath;
+    bool canPreserveHiResOBJ = currentLinesHiRes && !redrawsFullOBJLayer;
+    bool canUseHiResOBJ = _3DRenderScale > 1 && !objMosaicFallback
         && (canStartHiResOBJ || canPreserveHiResOBJ);
     if (canUseHiResOBJ)
     {
         drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale);
-        OBJHiResValid[CurUnit->Num] = true;
+        SetOBJHiResLines(CurUnit->Num, (u32)firstLine, (u32)linesCount, true);
     }
     else
     {
-        OBJHiResValid[CurUnit->Num] = false;
+        SetOBJHiResLines(CurUnit->Num, (u32)firstLine, (u32)linesCount, false);
     }
 
     DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
@@ -2044,6 +2097,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
     OBJBatchFirstLine[CurUnit->Num] += OBJBatchLinesCount[CurUnit->Num];
     OBJBatchLinesCount[CurUnit->Num] = 0;
+    if ((u32)curline < NativeHeight)
+        OBJCompositionDirty[CurUnit->Num] = true;
 }
 
 void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
@@ -2345,7 +2400,8 @@ void DekoRenderer::ComposeBGOBJ()
             ? (descriptorOffset_IntermedFb + fb_OBJ + fb_Count * CurUnit->Num)
             : descriptorOffset_DisabledBG;
         int objTextureHandleIdx = nativeObjTextureHandleIdx;
-        if (_3DRenderScale > 1 && OBJHiResValid[CurUnit->Num] && (region.DispCnt & (1<<12)))
+        if (_3DRenderScale > 1 && (region.DispCnt & (1<<12))
+            && OBJHiResLinesValid(CurUnit->Num, firstLine, region.LinesCount))
         {
             objTextureHandleIdx = descriptorOffset_IntermedFbHiRes + fb_OBJ + fb_Count * CurUnit->Num;
             composeUniform.HiResOBJ = 1;
@@ -2459,7 +2515,6 @@ void DekoRenderer::ComposeBGOBJ()
     }
 
     BGOBJRedrawn[CurUnit->Num] = 0;
-    OBJHiResFallback[CurUnit->Num] = false;
 
     if (CurUnit->Num == 0 && CaptureLatch)
     {
