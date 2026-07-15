@@ -87,6 +87,8 @@ private:
     int _3DRenderScale = 1;
 
     u16 DisplayCaptureSourceB[256*192];
+    u32 DisplayCaptureSourceBAddr[192];
+    u8 DisplayCaptureSourceBVRAMBank[192];
 
     dk::Image FinalFramebuffers[2][2];
     GpuMemHeap::Allocation FinalFramebufferMemory;

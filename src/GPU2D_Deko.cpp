@@ -348,6 +348,9 @@ void DekoRenderer::Reset()
 
     CaptureLatch = false;
     CaptureCnt = 0;
+    memset(DisplayCaptureSourceB, 0, sizeof(DisplayCaptureSourceB));
+    memset(DisplayCaptureSourceBAddr, 0, sizeof(DisplayCaptureSourceBAddr));
+    memset(DisplayCaptureSourceBVRAMBank, 0xFF, sizeof(DisplayCaptureSourceBVRAMBank));
 
     memset(OAMShadow, 0, sizeof(OAMShadow));
 }
@@ -547,6 +550,8 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
     if (CurUnit->Num == 0 && CaptureLatch && ((CaptureCnt >> 29) & 0x3) != 0)
     {
         u16* dst = &DisplayCaptureSourceB[n3dline*NativeWidth];
+        DisplayCaptureSourceBAddr[n3dline] = 0;
+        DisplayCaptureSourceBVRAMBank[n3dline] = 0xFF;
         if (CaptureCnt & (1<<25))
         {
             memcpy(dst, CurUnit->DispFIFOBuffer, NativeWidth*2);
@@ -563,9 +568,11 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             if (((dispCnt >> 16) & 0x3) != 2)
                 srcBaddr += ((CaptureCnt >> 26) & 0x3) << 14;
             srcBaddr &= 0xFFFF;
+            DisplayCaptureSourceBAddr[n3dline] = srcBaddr;
 
             if (src)
             {
+                DisplayCaptureSourceBVRAMBank[n3dline] = srcvram;
                 u32 firstCopy = NativeWidth;
                 if (srcBaddr + firstCopy > 0x10000)
                     firstCopy = 0x10000 - srcBaddr;
@@ -807,11 +814,9 @@ void DekoRenderer::DoCapture()
     u8* srcA = Gfx::DataHeap->CpuAddr<u8>(DisplayCaptureMemory);
 
     u32 source = (CaptureCnt >> 29) & 0x3;
-    u32 srcBaddr = 0;
     u16* srcB = source != 0 ? DisplayCaptureSourceB : NULL;
 
     dstaddr &= 0xFFFF;
-    srcBaddr &= 0xFFFF;
 
     static_assert(GPU::VRAMDirtyGranularity == 512, "");
     auto markCaptureDirty = [&](u32 dstpos, u32 pixels)
@@ -836,6 +841,42 @@ void DekoRenderer::DoCapture()
     };
     markCaptureDirty(dstaddr, width*height);
 
+    u64 captureWritten[0x10000 / 64] = {};
+    auto isCaptureWritten = [&](u32 pos)
+    {
+        pos &= 0xFFFF;
+        return (captureWritten[pos >> 6] & (1ULL << (pos & 63))) != 0;
+    };
+    auto markCaptureWritten = [&](u32 dstpos, u32 pixels)
+    {
+        dstpos &= 0xFFFF;
+        while (pixels > 0)
+        {
+            u32 bit = dstpos & 63;
+            u32 amount = 64 - bit;
+            u32 bankLeft = 0x10000 - dstpos;
+            if (amount > pixels) amount = pixels;
+            if (amount > bankLeft) amount = bankLeft;
+
+            u64 mask = amount == 64 ? ~0ULL : ((1ULL << amount) - 1ULL) << bit;
+            captureWritten[dstpos >> 6] |= mask;
+
+            dstpos = (dstpos + amount) & 0xFFFF;
+            pixels -= amount;
+        }
+    };
+    auto loadSourceBPixel = [&](u32 line, u32 x)
+    {
+        if (DisplayCaptureSourceBVRAMBank[line] == dstvram)
+        {
+            u32 vramPos = (DisplayCaptureSourceBAddr[line] + x) & 0xFFFF;
+            if (isCaptureWritten(vramPos))
+                return dst[vramPos];
+        }
+
+        return DisplayCaptureSourceB[line*NativeWidth + x];
+    };
+
     u32 eva = CaptureCnt & 0x1F;
     u32 evb = (CaptureCnt >> 8) & 0x1F;
 
@@ -854,37 +895,6 @@ void DekoRenderer::DoCapture()
 
     //printf("capturing %d %dx%d to %d (eva %d | evb %d) %p %p\n", source, width, height, dstvram, eva, evb, srcA, srcB);
 
-    auto copyCapturePixels = [&](u32& dstpos, u16* src, u32 srcpos, u32 count)
-    {
-        while (count > 0)
-        {
-            u32 dstLeft = 0x10000 - dstpos;
-            u32 srcLeft = 0x10000 - srcpos;
-            u32 copyAmount = count;
-            if (copyAmount > dstLeft) copyAmount = dstLeft;
-            if (copyAmount > srcLeft) copyAmount = srcLeft;
-
-            memcpy(&dst[dstpos], &src[srcpos], copyAmount*2);
-            dstpos = (dstpos + copyAmount) & 0xFFFF;
-            srcpos = (srcpos + copyAmount) & 0xFFFF;
-            count -= copyAmount;
-        }
-    };
-
-    auto clearCapturePixels = [&](u32& dstpos, u32 count)
-    {
-        while (count > 0)
-        {
-            u32 dstLeft = 0x10000 - dstpos;
-            u32 clearAmount = count;
-            if (clearAmount > dstLeft) clearAmount = dstLeft;
-
-            memset(&dst[dstpos], 0, clearAmount*2);
-            dstpos = (dstpos + clearAmount) & 0xFFFF;
-            count -= clearAmount;
-        }
-    };
-
     switch (source)
     {
     case 0: // source A
@@ -901,7 +911,9 @@ void DekoRenderer::DoCapture()
                     uint8x16_t alpha = vtstq_u8(pixels.val[3], pixels.val[3]);
                     high = vbslq_u8(vdupq_n_u8(0x80), alpha, high);
 
+                    u32 writePos = dstaddr;
                     vst2q_u8((u8*)&dst[dstaddr], {low, high});
+                    markCaptureWritten(writePos, 16);
                     dstaddr = (dstaddr + 16) & 0xFFFF;
                 }
             }
@@ -912,11 +924,38 @@ void DekoRenderer::DoCapture()
         {
             for (u32 j = 0; j < height; j++)
             {
-                u32 rowSrcBaddr = (srcBaddr + j*NativeWidth) & 0xFFFF;
-                if (srcB)
-                    copyCapturePixels(dstaddr, srcB, rowSrcBaddr, width);
-                else
-                    clearCapturePixels(dstaddr, width);
+                for (u32 i = 0; i < width;)
+                {
+                    u32 copyAmount = width - i;
+                    u32 dstLeft = 0x10000 - dstaddr;
+                    if (copyAmount > dstLeft) copyAmount = dstLeft;
+
+                    if (DisplayCaptureSourceBVRAMBank[j] == dstvram)
+                    {
+                        for (u32 k = 0; k < copyAmount; k++)
+                        {
+                            dst[dstaddr] = loadSourceBPixel(j, i + k);
+                            markCaptureWritten(dstaddr, 1);
+                            dstaddr = (dstaddr + 1) & 0xFFFF;
+                        }
+                    }
+                    else if (srcB)
+                    {
+                        u32 writePos = dstaddr;
+                        memcpy(&dst[dstaddr], &srcB[j*NativeWidth + i], copyAmount*2);
+                        markCaptureWritten(writePos, copyAmount);
+                        dstaddr = (dstaddr + copyAmount) & 0xFFFF;
+                    }
+                    else
+                    {
+                        u32 writePos = dstaddr;
+                        memset(&dst[dstaddr], 0, copyAmount*2);
+                        markCaptureWritten(writePos, copyAmount);
+                        dstaddr = (dstaddr + copyAmount) & 0xFFFF;
+                    }
+
+                    i += copyAmount;
+                }
             }
         }
         break;
@@ -930,11 +969,22 @@ void DekoRenderer::DoCapture()
                 uint8x16_t evbMask = vdupq_n_u8(evb ? 0xFF : 0);
                 for (u32 j = 0; j < height; j++)
                 {
-                    u32 rowSrcBaddr = (srcBaddr + j*NativeWidth) & 0xFFFF;
+                    bool sourceBMayOverlap = DisplayCaptureSourceBVRAMBank[j] == dstvram;
                     for (u32 i = 0; i < width; i += 16)
                     {
                         uint8x16x4_t pixelsA = vld4q_u8(&srcA[(i + j * 256) * 4]);
-                        uint8x16x2_t pixelsB = vld2q_u8((u8*)&srcB[rowSrcBaddr]);
+                        u16 sourceBBlock[16];
+                        uint8x16x2_t pixelsB;
+                        if (sourceBMayOverlap)
+                        {
+                            for (u32 k = 0; k < 16; k++)
+                                sourceBBlock[k] = loadSourceBPixel(j, i + k);
+                            pixelsB = vld2q_u8((u8*)sourceBBlock);
+                        }
+                        else
+                        {
+                            pixelsB = vld2q_u8((u8*)&srcB[j*NativeWidth + i]);
+                        }
                         uint8x16_t alphaA = vtstq_u8(pixelsA.val[3], pixelsA.val[3]);
                         uint8x16_t alphaB = vtstq_u8(pixelsB.val[1], vdupq_n_u8(0x80));
 
@@ -977,9 +1027,10 @@ void DekoRenderer::DoCapture()
                         finalVal.val[0] = vorrq_u8(finalR, vshlq_n_u8(finalG, 5));
                         finalVal.val[1] = vbslq_u8(vdupq_n_u8(0x7F), vorrq_u8(vshlq_n_u8(finalB, 2), vshrq_n_u8(finalG, 3)), alpha);
 
+                        u32 writePos = dstaddr;
                         vst2q_u8((u8*)&dst[dstaddr], finalVal);
+                        markCaptureWritten(writePos, 16);
 
-                        rowSrcBaddr = (rowSrcBaddr + 16) & 0xFFFF;
                         dstaddr = (dstaddr + 16) & 0xFFFF;
                     }
                 }
@@ -1017,7 +1068,9 @@ void DekoRenderer::DoCapture()
                         finalVal.val[0] = vorrq_u8(finalR, vshlq_n_u8(finalG, 5));
                         finalVal.val[1] = vbslq_u8(vdupq_n_u8(0x7F), vorrq_u8(vshlq_n_u8(finalB, 2), vshrq_n_u8(finalG, 3)), alpha);
 
+                        u32 writePos = dstaddr;
                         vst2q_u8((u8*)&dst[dstaddr], finalVal);
+                        markCaptureWritten(writePos, 16);
                         dstaddr = (dstaddr + 16) & 0xFFFF;
                     }
                 }
