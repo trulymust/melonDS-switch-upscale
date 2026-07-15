@@ -1939,7 +1939,8 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
             assert(firstLine != -1);
             int state = BGState[CurUnit->Num][i];
             bool redrawsFullBGLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
-            bool canUseHiResBG = _3DRenderScale > 1
+            bool bgHasHiResPath = state >= bgState_Affine;
+            bool canUseHiResBG = _3DRenderScale > 1 && bgHasHiResPath
                 && ((BGHiResValid[CurUnit->Num] & (1U << i)) || redrawsFullBGLayer);
             if (state >= bgState_Text4bpp)
             {
