@@ -1224,6 +1224,7 @@ void DekoRenderer::DrawScanline_BGOBJ(u32 line)
     if (CurUnit->DispCnt & (1<<7))
     {
         memset(&DirectBitmap[CurUnit->Num][line*256], 0xFF, 256*2);
+        DirectBitmapNeeded[CurUnit->Num] = true;
 
         for (int i = 0; i < 4; i++)
             BGState[CurUnit->Num][i] = bgState_Disable;
