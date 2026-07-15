@@ -58,10 +58,18 @@ public:
         if (_3DRenderScale != newScale)
         {
             _3DRenderScale = newScale;
-            BGHiResValid[0] = 0;
-            BGHiResValid[1] = 0;
-            OBJHiResValid[0] = false;
-            OBJHiResValid[1] = false;
+            for (int unit = 0; unit < 2; unit++)
+            {
+                BGHiResValid[unit] = 0;
+                OBJHiResValid[unit] = false;
+                OBJBatchFirstLine[unit] = 0;
+                OBJBatchLinesCount[unit] = 0;
+                for (int bg = 0; bg < 4; bg++)
+                {
+                    BGBatchFirstLine[unit][bg] = 0;
+                    BGBatchLinesCount[unit][bg] = 0;
+                }
+            }
         }
     }
 

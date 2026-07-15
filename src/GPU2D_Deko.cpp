@@ -314,8 +314,8 @@ void DekoRenderer::Reset()
         LastMasterBrightness[i] = 0;
         LastForceBlank[i] = false;
         DirectBitmapNeeded[i] = false;
-        LastBGMosaicSizeX[0] = 0;
-        LastBGMosaicYMax[0] = 0;
+        LastBGMosaicSizeX[i] = 0;
+        LastBGMosaicYMax[i] = 0;
 
         for (int j = 0; j < 4; j++)
         {
@@ -753,7 +753,7 @@ void DekoRenderer::DoCapture()
 
     u8* srcA = Gfx::DataHeap->CpuAddr<u8>(DisplayCaptureMemory);
 
-    u32 srcBaddr;
+    u32 srcBaddr = 0;
     u16* srcB = NULL;
 
     if (CaptureCnt & (1<<25))
