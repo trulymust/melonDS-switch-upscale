@@ -1919,6 +1919,28 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
                     BGHiResValid[CurUnit->Num] &= ~(1U << i);
                 }
             }
+            else
+            {
+                BGOBJRedrawn[CurUnit->Num] |= (1 << i);
+
+                auto clearBGAtScale = [&](dk::Image& target, u32 renderScale)
+                {
+                    u32 width = NativeWidth * renderScale;
+                    u32 height = NativeHeight * renderScale;
+                    DkViewport viewport = {0.f, 0.f, (float)width, (float)height, 0.f, 1.f};
+                    EmuCmdBuf.setViewports(0, {viewport, viewport});
+
+                    dk::ImageView colorTarget{target};
+                    EmuCmdBuf.bindRenderTargets({&colorTarget});
+                    EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine * renderScale, width, (u32)linesCount * renderScale}});
+                    EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+                };
+
+                clearBGAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_BG0 + i], 1);
+                if (_3DRenderScale > 1)
+                    clearBGAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i], (u32)_3DRenderScale);
+                BGHiResValid[CurUnit->Num] &= ~(1U << i);
+            }
 
             assert(BGBatchLinesCount[CurUnit->Num][i] > 0);
             BGBatchFirstLine[CurUnit->Num][i] += BGBatchLinesCount[CurUnit->Num][i];
