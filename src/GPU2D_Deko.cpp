@@ -469,7 +469,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
 
     bool forceblank = false;
 
-    if (line > 192) forceblank = true;
+    if (line >= NativeHeight) forceblank = true;
     if (CurUnit->Num && !CurUnit->Enabled) forceblank = true;
 
     OpenCmdBuf();
@@ -711,7 +711,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
         switch (dispmode)
         {
         case 0:
-            memset(&DirectBitmap[num][line*256], 0xFF, 256*2);
+            memset(&DirectBitmap[num][n3dline*256], 0xFF, 256*2);
             DirectBitmapNeeded[num] = true;
             break;
         case 2:
@@ -723,27 +723,28 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
                     u16* vram = (u16*)GPU::VRAM[vrambank];
                     vram = &vram[line * 256];
 
-                    memcpy(&DirectBitmap[num][line*256], vram, 256*2);
+                    memcpy(&DirectBitmap[num][n3dline*256], vram, 256*2);
                 }
                 else
                 {
-                    memset(&DirectBitmap[num][line*256], 0, 256*2);
+                    memset(&DirectBitmap[num][n3dline*256], 0, 256*2);
                 }
             }
             break;
         case 3:
             DirectBitmapNeeded[num] = true;
-            memcpy(&DirectBitmap[num][line*256], CurUnit->DispFIFOBuffer, 256*2);
+            memcpy(&DirectBitmap[num][n3dline*256], CurUnit->DispFIFOBuffer, 256*2);
             break;
         }
     }
     else
     {
         DirectBitmapNeeded[num] = true;
-        memset(&DirectBitmap[num][line*256], 0xFF, 256*2);
+        memset(&DirectBitmap[num][n3dline*256], 0xFF, 256*2);
     }
 
-    DrawScanline_BGOBJ(line);
+    if (!forceblank)
+        DrawScanline_BGOBJ(line);
 
     for (u32 i = 0; i < 4; i++)
     {
