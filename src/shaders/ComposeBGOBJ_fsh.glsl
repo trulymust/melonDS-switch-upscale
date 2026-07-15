@@ -27,7 +27,7 @@ layout (std140, binding = 0) uniform ComposeUniform
     uint EVA, EVB, EVY;
 
     uint BGNumMask0, BGNumMask1, BGNumMask2, BGNumMask3;
-    uint RenderScale, FinalScale, HiResBGMask, __pad0;
+    uint RenderScale, FinalScale, HiResBGMask, HiResOBJ;
     uvec4 Window[192];
 };
 
@@ -120,7 +120,7 @@ void main()
     uint bgLayer2 = texelFetch(BGLayer2, (HiResBGMask & (1U<<2)) != 0U ? position : nativePosition, 0).r;
     uint bgLayer3 = texelFetch(BGLayer3, (HiResBGMask & (1U<<3)) != 0U ? position : nativePosition, 0).r;
 
-    uint spriteLayer = texelFetch(SpriteLayer, nativePosition, 0).r;
+    uint spriteLayer = texelFetch(SpriteLayer, HiResOBJ != 0U ? position : nativePosition, 0).r;
 
     if ((winAttr & BGNumMask0) == 0U)
         bgLayer0 = 0U;

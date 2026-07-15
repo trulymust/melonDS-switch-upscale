@@ -54,7 +54,15 @@ public:
     }
     void Set3DRenderScale(int scale)
     {
-        _3DRenderScale = scale < 1 ? 1 : (scale > MaxRenderScale ? MaxRenderScale : scale);
+        int newScale = scale < 1 ? 1 : (scale > MaxRenderScale ? MaxRenderScale : scale);
+        if (_3DRenderScale != newScale)
+        {
+            _3DRenderScale = newScale;
+            BGHiResValid[0] = 0;
+            BGHiResValid[1] = 0;
+            OBJHiResValid[0] = false;
+            OBJHiResValid[1] = false;
+        }
     }
 
     dk::Fence FramebufferReady[2] = {};
@@ -97,8 +105,14 @@ private:
     };
     dk::Image IntermedFramebuffers[fb_Count*2];
     GpuMemHeap::Allocation IntermedFramebufferMemory;
+    dk::Image IntermedFramebuffersHiRes[fb_Count*2];
+    GpuMemHeap::Allocation IntermedFramebufferHiResMemory;
+    u32 BGHiResValid[2] = {};
+    bool OBJHiResValid[2] = {};
     dk::Image OBJDepth;
     GpuMemHeap::Allocation OBJDepthMemory;
+    dk::Image OBJDepthHiRes;
+    GpuMemHeap::Allocation OBJDepthHiResMemory;
     dk::Image OBJWindow[2];
     GpuMemHeap::Allocation OBJWindowMemory;
 
@@ -120,7 +134,8 @@ private:
     enum
     {
         descriptorOffset_IntermedFb = 0,
-        descriptorOffset_VRAM8 = descriptorOffset_IntermedFb+fb_Count*2,
+        descriptorOffset_IntermedFbHiRes = descriptorOffset_IntermedFb+fb_Count*2,
+        descriptorOffset_VRAM8 = descriptorOffset_IntermedFbHiRes+fb_Count*2,
         descriptorOffset_VRAM16 = descriptorOffset_VRAM8+textureVRAM_Count,
         descriptorOffset_Palettes = descriptorOffset_VRAM16+textureVRAM_Count,
         descriptorOffset_DirectBitmap = descriptorOffset_Palettes+2,
@@ -202,7 +217,7 @@ private:
         u32 BlendCnt, StandardColorEffect;
         u32 EVA, EVB, EVY;
         u32 BGNumMask[4];
-        u32 RenderScale, FinalScale, HiResBGMask, __pad0;
+        u32 RenderScale, FinalScale, HiResBGMask, HiResOBJ;
         u32 Window[192*4];
     };
     const u32 ComposeUniformSize = (sizeof(ComposeUniform) + DK_UNIFORM_BUF_ALIGNMENT - 1) & ~(DK_UNIFORM_BUF_ALIGNMENT - 1);
@@ -217,13 +232,13 @@ private:
             {
                 u32 TilesetAddr, WideXMask, BGVRAMMask, BasePalette;
                 u32 MetaMask, ExtpalMask, __pad1, __pad2;
-                u32 __pad3, __pad4, __pad5, MosaicLevel;
+                u32 __pad3, __pad4, RenderScale, MosaicLevel;
             } Text;
             struct
             {
                 u32 TilesetAddr, TilemapAddr, BGVRAMMask, YShift;
                 u32 XMask, YMask, OfxMask, OfyMask;
-                u32 MetaMask, ExtPalMask, __pad2, MosaicLevel;
+                u32 MetaMask, ExtPalMask, RenderScale, MosaicLevel;
             } Affine;
         };
 

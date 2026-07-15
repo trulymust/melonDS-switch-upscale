@@ -14,13 +14,18 @@ layout (std140, binding = 0) uniform BGUniform
 {
     uint TilesetAddr, WideXMask, BGVRAMMask, BasePalette;
     uint MetaMask, ExtPalMask, pad0, pad1;
-    uint pad2, pad3, pad4, MosaicLevel;
+    uint pad2, pad3, RenderScale, MosaicLevel;
     uvec4 PerLineData[192]; // xoff, yoff, tilemapaddr
 };
 
 void main()
 {
     uvec2 position = uvec2(gl_FragCoord.xy);
+    if (RenderScale == 2U)
+        position >>= 1;
+    else if (RenderScale == 4U)
+        position >>= 2;
+
 #ifdef Mosaic
     position.x = int(texelFetch(MosaicTable, ivec2(position.x, int(MosaicLevel)), 0).x);
 #endif

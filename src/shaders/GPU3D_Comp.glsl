@@ -1345,12 +1345,12 @@ uint BlendFog(uint color, uint depth)
         : (finalColorRB | (finalColorGA << 8));
 }
 
-void main()
+uint Resolve3DPixel(ivec2 highResPosition)
 {
     int scale = max(int(RenderScale), 1);
     int scrollWrapWidth = NativeWidth * 2 * scale;
-    int srcX = (int(gl_GlobalInvocationID.x) + int(XScroll) * scale) & (scrollWrapWidth - 1);
-    int srcY = int(gl_GlobalInvocationID.y);
+    int srcX = (highResPosition.x + int(XScroll) * scale) & (scrollWrapWidth - 1);
+    int srcY = highResPosition.y;
     int framebufferStride = int(RenderWidth * RenderHeight);
     int resultOffset = srcX + srcY * int(RenderWidth);
 
@@ -1463,20 +1463,103 @@ void main()
     else
         color.x = 0U;
 
-    //if (gl_LocalInvocationID.x == 7 || gl_LocalInvocationID.y == 7)
-        //color.x = 0x1F00001FU | 0x40000000U;
+    return color.x;
+}
+
+void AccumulateNative3DSample(ivec2 highResPosition, inout uint sumR, inout uint sumG, inout uint sumB, inout uint sumA, inout uint colorWeight)
+{
+    uint color = Resolve3DPixel(highResPosition);
+    uint alpha = (color >> 24) & 0x1FU;
+    if (alpha == 0U)
+        return;
+
+    sumR += (color & 0x3FU) * alpha;
+    sumG += ((color >> 8) & 0x3FU) * alpha;
+    sumB += ((color >> 16) & 0x3FU) * alpha;
+    sumA += alpha;
+    colorWeight += alpha;
+}
+
+uint ResolveNative3DBlock(ivec2 nativePosition)
+{
+    int scale = max(int(RenderScale), 1);
+    if (scale == 1)
+        return Resolve3DPixel(nativePosition);
+
+    ivec2 highResBase = nativePosition * scale;
+    uint sumR = 0U;
+    uint sumG = 0U;
+    uint sumB = 0U;
+    uint sumA = 0U;
+    uint colorWeight = 0U;
+    uint sampleCount = 1U;
+
+    if (scale == 2)
+    {
+        sampleCount = 4U;
+        AccumulateNative3DSample(highResBase + ivec2(0, 0), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(1, 0), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(0, 1), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(1, 1), sumR, sumG, sumB, sumA, colorWeight);
+    }
+    else if (scale == 4)
+    {
+        sampleCount = 16U;
+        AccumulateNative3DSample(highResBase + ivec2(0, 0), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(1, 0), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(2, 0), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(3, 0), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(0, 1), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(1, 1), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(2, 1), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(3, 1), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(0, 2), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(1, 2), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(2, 2), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(3, 2), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(0, 3), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(1, 3), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(2, 3), sumR, sumG, sumB, sumA, colorWeight);
+        AccumulateNative3DSample(highResBase + ivec2(3, 3), sumR, sumG, sumB, sumA, colorWeight);
+    }
+    else
+    {
+        AccumulateNative3DSample(highResBase, sumR, sumG, sumB, sumA, colorWeight);
+    }
+
+    if (colorWeight == 0U)
+        return 0U;
+
+    uint resolvedA = min((sumA + sampleCount / 2U) / sampleCount, 31U);
+    if (resolvedA == 0U)
+        return 0U;
+
+    uint resolvedR = min((sumR + colorWeight / 2U) / colorWeight, 63U);
+    uint resolvedG = min((sumG + colorWeight / 2U) / colorWeight, 63U);
+    uint resolvedB = min((sumB + colorWeight / 2U) / colorWeight, 63U);
+
+    return 0x40000000U | (resolvedA << 24) | resolvedR | (resolvedG << 8) | (resolvedB << 16);
+}
+
+void main()
+{
+    int scale = max(int(RenderScale), 1);
 
     ivec2 highResPosition = ivec2(gl_GlobalInvocationID.xy);
-    imageStore(FinalFBHiRes, highResPosition, uvec4(color.x, 0, 0, 0));
+    imageStore(FinalFBHiRes, highResPosition, uvec4(Resolve3DPixel(highResPosition), 0, 0, 0));
 
-    if (scale == 1 || ((highResPosition.x | highResPosition.y) & (scale - 1)) == 0)
+    bool writeNativePixel = scale == 1;
+    if (scale == 2 || scale == 4)
+        writeNativePixel = ((highResPosition.x | highResPosition.y) & (scale - 1)) == 0;
+
+    if (writeNativePixel)
     {
         ivec2 nativePosition = highResPosition;
         if (scale == 2)
             nativePosition = highResPosition >> 1;
         else if (scale == 4)
             nativePosition = highResPosition >> 2;
-        imageStore(FinalFB, nativePosition, uvec4(color.x, 0, 0, 0));
+        imageStore(FinalFB, nativePosition, uvec4(ResolveNative3DBlock(nativePosition), 0, 0, 0));
     }
 }
 

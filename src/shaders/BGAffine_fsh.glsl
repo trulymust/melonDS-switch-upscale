@@ -16,21 +16,52 @@ layout (std140, binding = 0) uniform BGUniform
 {
     int TilesetAddr, TilemapAddr, BGVRAMMask, YShift;
     int XMask, YMask, OfxMask, OfyMask;
-    uint MetaMask, ExtPalMask, pad0, MosaicLevel;
+    uint MetaMask, ExtPalMask, RenderScale, MosaicLevel;
     ivec4 PerLineData[192]; // rotX, rotY, rotA, rotC
 };
 
 void main()
 {
     ivec2 position = ivec2(gl_FragCoord.xy);
+    ivec2 nativePosition = position;
+    int scale = max(int(RenderScale), 1);
+    int subY = 0;
+
+    if (RenderScale == 2U)
+    {
+        nativePosition = position >> 1;
+        subY = position.y & 1;
+    }
+    else if (RenderScale == 4U)
+    {
+        nativePosition = position >> 2;
+        subY = position.y & 3;
+    }
 
 #ifdef Mosaic
-    position.x = int(texelFetch(MosaicTable, ivec2(position.x, int(MosaicLevel)), 0).x);
+    nativePosition.x = int(texelFetch(MosaicTable, ivec2(nativePosition.x, int(MosaicLevel)), 0).x);
+    position.x = nativePosition.x * scale;
 #endif
 
-    ivec4 perLineData = PerLineData[position.y];
+    ivec4 perLineData = PerLineData[nativePosition.y];
+    ivec2 lineBase = perLineData.xy;
 
-    ivec2 rot = perLineData.xy + int(position).x * perLineData.zw;
+    if (scale > 1 && nativePosition.y < 191)
+    {
+        ivec2 nextLineBase = PerLineData[nativePosition.y + 1].xy;
+        if (RenderScale == 2U)
+            lineBase += ((nextLineBase - lineBase) * subY) / 2;
+        else if (RenderScale == 4U)
+            lineBase += ((nextLineBase - lineBase) * subY) / 4;
+    }
+
+    ivec2 xStep = position.x * perLineData.zw;
+    if (RenderScale == 2U)
+        xStep /= 2;
+    else if (RenderScale == 4U)
+        xStep /= 4;
+
+    ivec2 rot = lineBase + xStep;
 
 #if defined(ExtendedMixed) || defined(Affine)
     if (((rot.x | rot.y) & OfxMask) == 0)
