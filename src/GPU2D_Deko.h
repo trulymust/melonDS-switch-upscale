@@ -348,16 +348,16 @@ private:
 
     u8 OAMShadow[2*1024];
 
-    template<u32 bgmode> void DrawScanlineBGMode(u32 line);
-    void DrawScanlineBGMode6(u32 line);
-    void DrawScanlineBGMode7(u32 line);
-    void DrawScanline_BGOBJ(u32 line);
+    template<u32 bgmode> void DrawScanlineBGMode(u32 line, u32 outputLine);
+    void DrawScanlineBGMode6(u32 line, u32 outputLine);
+    void DrawScanlineBGMode7(u32 line, u32 outputLine);
+    void DrawScanline_BGOBJ(u32 line, u32 outputLine);
 
-    void DrawBG_3D(u32 line);
-    void DrawBG_Text(u32 line, u32 bgnum);
-    void DrawBG_Affine(u32 line, u32 bgnum);
-    void DrawBG_Extended(u32 line, u32 bgnum);
-    void DrawBG_Large(u32 line);
+    void DrawBG_3D(u32 outputLine);
+    void DrawBG_Text(u32 line, u32 outputLine, u32 bgnum);
+    void DrawBG_Affine(u32 outputLine, u32 bgnum);
+    void DrawBG_Extended(u32 outputLine, u32 bgnum);
+    void DrawBG_Large(u32 outputLine);
 };
 
 }

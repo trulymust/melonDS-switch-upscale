@@ -744,7 +744,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
     }
 
     if (!forceblank)
-        DrawScanline_BGOBJ(line);
+        DrawScanline_BGOBJ(line, n3dline);
 
     for (u32 i = 0; i < 4; i++)
     {
@@ -1218,12 +1218,12 @@ void DekoRenderer::VBlankEnd(Unit* unitA, Unit* unitB)
     
 }
 
-void DekoRenderer::DrawScanline_BGOBJ(u32 line)
+void DekoRenderer::DrawScanline_BGOBJ(u32 line, u32 outputLine)
 {
     // forced blank disables BG/OBJ compositing
     if (CurUnit->DispCnt & (1<<7))
     {
-        memset(&DirectBitmap[CurUnit->Num][line*256], 0xFF, 256*2);
+        memset(&DirectBitmap[CurUnit->Num][outputLine*256], 0xFF, 256*2);
         DirectBitmapNeeded[CurUnit->Num] = true;
 
         for (int i = 0; i < 4; i++)
@@ -1231,7 +1231,7 @@ void DekoRenderer::DrawScanline_BGOBJ(u32 line)
         return;
     }
 
-    u32* window = &ComposeUniforms[CurUnit->Num].Window[line*4];
+    u32* window = &ComposeUniforms[CurUnit->Num].Window[outputLine*4];
 
     window[0] = (u32)CurUnit->WinCnt[2] | ((u32)CurUnit->WinCnt[1] << 16);
     window[1] = (u32)CurUnit->WinCnt[0] | ((u32)CurUnit->WinCnt[3] << 16);
@@ -1274,14 +1274,14 @@ void DekoRenderer::DrawScanline_BGOBJ(u32 line)
 
     switch (CurUnit->DispCnt & 0x7)
     {
-    case 0: DrawScanlineBGMode<0>(line); break;
-    case 1: DrawScanlineBGMode<1>(line); break;
-    case 2: DrawScanlineBGMode<2>(line); break;
-    case 3: DrawScanlineBGMode<3>(line); break;
-    case 4: DrawScanlineBGMode<4>(line); break;
-    case 5: DrawScanlineBGMode<5>(line); break;
-    case 6: DrawScanlineBGMode6(line); break;
-    case 7: DrawScanlineBGMode7(line); break;
+    case 0: DrawScanlineBGMode<0>(line, outputLine); break;
+    case 1: DrawScanlineBGMode<1>(line, outputLine); break;
+    case 2: DrawScanlineBGMode<2>(line, outputLine); break;
+    case 3: DrawScanlineBGMode<3>(line, outputLine); break;
+    case 4: DrawScanlineBGMode<4>(line, outputLine); break;
+    case 5: DrawScanlineBGMode<5>(line, outputLine); break;
+    case 6: DrawScanlineBGMode6(line, outputLine); break;
+    case 7: DrawScanlineBGMode7(line, outputLine); break;
     }
 
     if (CurUnit->BGMosaicY >= CurUnit->BGMosaicYMax)
@@ -1296,17 +1296,17 @@ void DekoRenderer::DrawScanline_BGOBJ(u32 line)
 }
 
 template<u32 bgmode>
-void DekoRenderer::DrawScanlineBGMode(u32 line)
+void DekoRenderer::DrawScanlineBGMode(u32 line, u32 outputLine)
 {
     u32 dispCnt = CurUnit->DispCnt;
     if (dispCnt & 0x0800)
     {
         if (bgmode >= 3)
-            DrawBG_Extended(line, 3);
+            DrawBG_Extended(outputLine, 3);
         else if (bgmode >= 1)
-            DrawBG_Affine(line, 3);
+            DrawBG_Affine(outputLine, 3);
         else
-            DrawBG_Text(line, 3);
+            DrawBG_Text(line, outputLine, 3);
     }
     else
     {
@@ -1315,11 +1315,11 @@ void DekoRenderer::DrawScanlineBGMode(u32 line)
     if (dispCnt & 0x0400)
     {
         if (bgmode == 5)
-            DrawBG_Extended(line, 2);
+            DrawBG_Extended(outputLine, 2);
         else if (bgmode == 4 || bgmode == 2)
-            DrawBG_Affine(line, 2);
+            DrawBG_Affine(outputLine, 2);
         else
-            DrawBG_Text(line, 2);
+            DrawBG_Text(line, outputLine, 2);
     }
     else
     {
@@ -1327,7 +1327,7 @@ void DekoRenderer::DrawScanlineBGMode(u32 line)
     }
     if (dispCnt & 0x0200)
     {
-        DrawBG_Text(line, 1);
+        DrawBG_Text(line, outputLine, 1);
     }
     else
     {
@@ -1336,9 +1336,9 @@ void DekoRenderer::DrawScanlineBGMode(u32 line)
     if (dispCnt & 0x0100)
     {
         if (!CurUnit->Num && (dispCnt & 0x8))
-            DrawBG_3D(line);
+            DrawBG_3D(outputLine);
         else
-            DrawBG_Text(line, 0);
+            DrawBG_Text(line, outputLine, 0);
     }
     else
     {
@@ -1346,7 +1346,7 @@ void DekoRenderer::DrawScanlineBGMode(u32 line)
     }
 }
 
-void DekoRenderer::DrawScanlineBGMode6(u32 line)
+void DekoRenderer::DrawScanlineBGMode6(u32 line, u32 outputLine)
 {
     u32 dispCnt = CurUnit->DispCnt;
 
@@ -1355,7 +1355,7 @@ void DekoRenderer::DrawScanlineBGMode6(u32 line)
 
     if (dispCnt & 0x0400)
     {
-        DrawBG_Large(line);
+        DrawBG_Large(outputLine);
     }
     else
     {
@@ -1364,7 +1364,7 @@ void DekoRenderer::DrawScanlineBGMode6(u32 line)
 
     if (dispCnt & 0x0100 && !CurUnit->Num && dispCnt & 0x8)
     {
-        DrawBG_3D(line);
+        DrawBG_3D(outputLine);
     }
     else
     {
@@ -1372,14 +1372,14 @@ void DekoRenderer::DrawScanlineBGMode6(u32 line)
     }
 }
 
-void DekoRenderer::DrawScanlineBGMode7(u32 line)
+void DekoRenderer::DrawScanlineBGMode7(u32 line, u32 outputLine)
 {
     u32 dispCnt = CurUnit->DispCnt;
     // mode 7 only has text-mode BG0 and BG1
 
     if (dispCnt & 0x0200)
     {
-        DrawBG_Text(line, 1);
+        DrawBG_Text(line, outputLine, 1);
     }
     else
     {
@@ -1389,9 +1389,9 @@ void DekoRenderer::DrawScanlineBGMode7(u32 line)
     if (dispCnt & 0x0100)
     {
         if (!CurUnit->Num && (dispCnt & 0x8))
-            DrawBG_3D(line);
+            DrawBG_3D(outputLine);
         else
-            DrawBG_Text(line, 0);
+            DrawBG_Text(line, outputLine, 0);
     }
     else
     {
@@ -1402,11 +1402,11 @@ void DekoRenderer::DrawScanlineBGMode7(u32 line)
     BGState[CurUnit->Num][3] = bgState_Disable;
 }
 
-void DekoRenderer::DrawBG_3D(u32 line)
+void DekoRenderer::DrawBG_3D(u32 outputLine)
 {
     BGState[CurUnit->Num][0] = bgState_3D;
 
-    /*u32* targetLine = &_3DFramebuffer[line * 256];
+    /*u32* targetLine = &_3DFramebuffer[outputLine * 256];
     for (u32 i = 0; i < 256; i += 16)
     {
         uint8x16x4_t pixels = vld4q_u8((u8*)&_3DLine[i]);
@@ -1417,7 +1417,7 @@ void DekoRenderer::DrawBG_3D(u32 line)
     }*/
 }
 
-void DekoRenderer::DrawBG_Text(u32 line, u32 bgnum)
+void DekoRenderer::DrawBG_Text(u32 line, u32 outputLine, u32 bgnum)
 {
     u16 bgcnt = CurUnit->BGCnt[bgnum];
 
@@ -1480,12 +1480,12 @@ void DekoRenderer::DrawBG_Text(u32 line, u32 bgnum)
         BGState[CurUnit->Num][bgnum] = bgState_Text4bpp;
     }
 
-    uniform.PerLineData[line*4+0] = xoff;
-    uniform.PerLineData[line*4+1] = yoff & 0x7;
-    uniform.PerLineData[line*4+2] = tilemapaddr;
+    uniform.PerLineData[outputLine*4+0] = xoff;
+    uniform.PerLineData[outputLine*4+1] = yoff & 0x7;
+    uniform.PerLineData[outputLine*4+2] = tilemapaddr;
 }
 
-void DekoRenderer::DrawBG_Affine(u32 line, u32 bgnum)
+void DekoRenderer::DrawBG_Affine(u32 outputLine, u32 bgnum)
 {
     u16 bgcnt = CurUnit->BGCnt[bgnum];
 
@@ -1521,10 +1521,10 @@ void DekoRenderer::DrawBG_Affine(u32 line, u32 bgnum)
         rotY -= (CurUnit->BGMosaicY * rotD);
     }
 
-    uniform.PerLineData[line*4+0] = (u32)rotX;
-    uniform.PerLineData[line*4+1] = (u32)rotY;
-    uniform.PerLineData[line*4+2] = (u32)(s32)rotA;
-    uniform.PerLineData[line*4+3] = (u32)(s32)rotC;
+    uniform.PerLineData[outputLine*4+0] = (u32)rotX;
+    uniform.PerLineData[outputLine*4+1] = (u32)rotY;
+    uniform.PerLineData[outputLine*4+2] = (u32)(s32)rotA;
+    uniform.PerLineData[outputLine*4+3] = (u32)(s32)rotC;
 
     uniform.Affine.BGVRAMMask = CurUnit->Num ? 0x1FFFF : 0x7FFFF;
 
@@ -1542,7 +1542,7 @@ void DekoRenderer::DrawBG_Affine(u32 line, u32 bgnum)
     BGState[CurUnit->Num][bgnum] = bgState_Affine;
 }
 
-void DekoRenderer::DrawBG_Extended(u32 line, u32 bgnum)
+void DekoRenderer::DrawBG_Extended(u32 outputLine, u32 bgnum)
 {
     u16 bgcnt = CurUnit->BGCnt[bgnum];
 
@@ -1566,10 +1566,10 @@ void DekoRenderer::DrawBG_Extended(u32 line, u32 bgnum)
 
     BGUniform& uniform = BGTextUniforms[CurUnit->Num][bgnum];
 
-    uniform.PerLineData[line*4+0] = (u32)rotX;
-    uniform.PerLineData[line*4+1] = (u32)rotY;
-    uniform.PerLineData[line*4+2] = (u32)(s32)rotA;
-    uniform.PerLineData[line*4+3] = (u32)(s32)rotC;
+    uniform.PerLineData[outputLine*4+0] = (u32)rotX;
+    uniform.PerLineData[outputLine*4+1] = (u32)rotY;
+    uniform.PerLineData[outputLine*4+2] = (u32)(s32)rotA;
+    uniform.PerLineData[outputLine*4+3] = (u32)(s32)rotC;
 
     uniform.Affine.BGVRAMMask = CurUnit->Num ? 0x1FFFF : 0x7FFFF;
 
@@ -1646,7 +1646,7 @@ void DekoRenderer::DrawBG_Extended(u32 line, u32 bgnum)
     }
 }
 
-void DekoRenderer::DrawBG_Large(u32 line)
+void DekoRenderer::DrawBG_Large(u32 outputLine)
 {
     u16 bgcnt = CurUnit->BGCnt[2];
     BGUniform& uniform = BGTextUniforms[CurUnit->Num][2];
@@ -1691,10 +1691,10 @@ void DekoRenderer::DrawBG_Large(u32 line)
         rotY -= (CurUnit->BGMosaicY * rotD);
     }
 
-    uniform.PerLineData[line*4+0] = (u32)rotX;
-    uniform.PerLineData[line*4+1] = (u32)rotY;
-    uniform.PerLineData[line*4+2] = (u32)(s32)rotA;
-    uniform.PerLineData[line*4+3] = (u32)(s32)rotC;
+    uniform.PerLineData[outputLine*4+0] = (u32)rotX;
+    uniform.PerLineData[outputLine*4+1] = (u32)rotY;
+    uniform.PerLineData[outputLine*4+2] = (u32)(s32)rotA;
+    uniform.PerLineData[outputLine*4+3] = (u32)(s32)rotC;
 
     uniform.Affine.BGVRAMMask = CurUnit->Num ? 0x1FFFF : 0x7FFFF;
 
