@@ -316,6 +316,11 @@ void DekoRenderer::Reset()
         DirectBitmapNeeded[i] = false;
         LastBGMosaicSizeX[i] = 0;
         LastBGMosaicYMax[i] = 0;
+        BGOBJRedrawn[i] = 0;
+        BGHiResValid[i] = 0;
+        OBJHiResValid[i] = false;
+        OBJWindowEmpty[i] = true;
+        ComposeRegions[i].clear();
 
         for (int j = 0; j < 4; j++)
         {
@@ -336,6 +341,10 @@ void DekoRenderer::Reset()
             AffineChangedMidframe[i][j] = false;
         }
     }
+
+    CaptureLatch = false;
+    CaptureCnt = 0;
+    DispCnt = 0;
 
     memset(OAMShadow, 0, sizeof(OAMShadow));
 }

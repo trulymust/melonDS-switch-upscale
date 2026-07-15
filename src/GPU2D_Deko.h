@@ -294,10 +294,10 @@ private:
 
     u8 BGOBJRedrawn[2] = {0};
 
-    bool OBJWindowEmpty[2];
+    bool OBJWindowEmpty[2] = {true, true};
 
-    bool CaptureLatch;
-    u32 CaptureCnt, DispCnt;
+    bool CaptureLatch = false;
+    u32 CaptureCnt = 0, DispCnt = 0;
 
     s32 OBJBatchFirstLine[2], OBJBatchLinesCount[2];
     s32 BGBatchFirstLine[2][4], BGBatchLinesCount[2][4];
