@@ -644,9 +644,11 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
         }
     }
 
-    if (n3dline == 0 && CurUnit->Num == 0 && !forceblank)
+    if (n3dline == 0 && CurUnit->Num == 0)
     {
-        if (CurUnit->CaptureCnt & (1 << 31))
+        CurUnit->CaptureLatch = false;
+        CaptureLatch = false;
+        if (!forceblank && (CurUnit->CaptureCnt & (1 << 31)))
         {
             CurUnit->CaptureLatch = true;
             CaptureLatch = true;
@@ -654,10 +656,6 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             memset(DisplayCaptureLine, 0xFF, sizeof(DisplayCaptureLine));
             memset(DisplayCaptureSourceBAddr, 0, sizeof(DisplayCaptureSourceBAddr));
             memset(DisplayCaptureSourceBVRAMBank, 0xFF, sizeof(DisplayCaptureSourceBVRAMBank));
-        }
-        else
-        {
-            CaptureLatch = false;
         }
     }
 
