@@ -131,6 +131,10 @@ private:
     GpuMemHeap::Allocation OBJDepthMemory;
     dk::Image OBJDepthHiRes;
     GpuMemHeap::Allocation OBJDepthHiResMemory;
+    dk::Image OBJMosaicScratch[2];
+    GpuMemHeap::Allocation OBJMosaicScratchMemory;
+    dk::Image OBJMosaicIndex[2];
+    GpuMemHeap::Allocation OBJMosaicIndexMemory;
     dk::Image OBJWindow[2];
     GpuMemHeap::Allocation OBJWindowMemory;
 
@@ -161,7 +165,9 @@ private:
         descriptorOffset_3DFramebufferHiRes,
         descriptorOffset_DisabledBG,
         descriptorOffset_MosaicTable,
-        descriptorOffset_OBJWindow,
+        descriptorOffset_OBJMosaicScratch,
+        descriptorOffset_OBJMosaicIndex = descriptorOffset_OBJMosaicScratch+2,
+        descriptorOffset_OBJWindow = descriptorOffset_OBJMosaicIndex+2,
         descriptorOffset_Count = descriptorOffset_OBJWindow+2
     };
     GpuMemHeap::Allocation ImageDescriptors;
@@ -202,8 +208,12 @@ private:
     dk::Shader ShaderOBJ4bpp;
     dk::Shader ShaderOBJ8bpp;
     dk::Shader ShaderOBJBitmap;
+    dk::Shader ShaderOBJ4bppIndexed;
+    dk::Shader ShaderOBJ8bppIndexed;
+    dk::Shader ShaderOBJBitmapIndexed;
     dk::Shader ShaderOBJWindow4bpp;
     dk::Shader ShaderOBJWindow8bpp;
+    dk::Shader ShaderOBJMosaicX;
 
     CmdMemRing<8> CmdMem;
 

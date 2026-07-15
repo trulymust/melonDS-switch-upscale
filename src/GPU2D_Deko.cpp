@@ -64,6 +64,18 @@ DekoRenderer::DekoRenderer() :
             IntermedFramebufferMemory.Offset + intermedFbLayout.getSize() * i);
     }
 
+    OBJMosaicScratchMemory = Gfx::TextureHeap->Alloc(intermedFbLayout.getSize() * 2, intermedFbLayout.getAlignment());
+    OBJMosaicIndexMemory = Gfx::TextureHeap->Alloc(intermedFbLayout.getSize() * 2, intermedFbLayout.getAlignment());
+    for (int i = 0; i < 2; i++)
+    {
+        OBJMosaicScratch[i].initialize(intermedFbLayout,
+            Gfx::TextureHeap->MemBlock,
+            OBJMosaicScratchMemory.Offset + intermedFbLayout.getSize() * i);
+        OBJMosaicIndex[i].initialize(intermedFbLayout,
+            Gfx::TextureHeap->MemBlock,
+            OBJMosaicIndexMemory.Offset + intermedFbLayout.getSize() * i);
+    }
+
     dk::ImageLayout hiResIntermedFbLayout;
     dk::ImageLayoutMaker{Gfx::Device}
         .setDimensions(FinalFramebufferWidth, FinalFramebufferHeight)
@@ -202,6 +214,8 @@ DekoRenderer::DekoRenderer() :
     {
         imageDescriptors[descriptorOffset_Palettes+i].initialize(dk::ImageView{PaletteTextures[i]});
         imageDescriptors[descriptorOffset_DirectBitmap+i].initialize(dk::ImageView{DirectBitmapTexture[i]});
+        imageDescriptors[descriptorOffset_OBJMosaicScratch+i].initialize(dk::ImageView{OBJMosaicScratch[i]});
+        imageDescriptors[descriptorOffset_OBJMosaicIndex+i].initialize(dk::ImageView{OBJMosaicIndex[i]});
         imageDescriptors[descriptorOffset_OBJWindow+i].initialize(dk::ImageView{OBJWindow[i]});
     }
     imageDescriptors[descriptorOffset_3DFramebuffer].initialize(dk::ImageView{_3DFramebuffer});
@@ -233,8 +247,12 @@ DekoRenderer::DekoRenderer() :
     Gfx::LoadShader("romfs:/shaders/OBJ4bpp_fsh.dksh", ShaderOBJ4bpp);
     Gfx::LoadShader("romfs:/shaders/OBJ8bpp_fsh.dksh", ShaderOBJ8bpp);
     Gfx::LoadShader("romfs:/shaders/OBJBitmap_fsh.dksh", ShaderOBJBitmap);
+    Gfx::LoadShader("romfs:/shaders/OBJ4bppIndexed_fsh.dksh", ShaderOBJ4bppIndexed);
+    Gfx::LoadShader("romfs:/shaders/OBJ8bppIndexed_fsh.dksh", ShaderOBJ8bppIndexed);
+    Gfx::LoadShader("romfs:/shaders/OBJBitmapIndexed_fsh.dksh", ShaderOBJBitmapIndexed);
     Gfx::LoadShader("romfs:/shaders/OBJWindow4bpp_fsh.dksh", ShaderOBJWindow4bpp);
     Gfx::LoadShader("romfs:/shaders/OBJWindow8bpp_fsh.dksh", ShaderOBJWindow8bpp);
+    Gfx::LoadShader("romfs:/shaders/OBJMosaicX_fsh.dksh", ShaderOBJMosaicX);
 
     BGUniformMemory = Gfx::DataHeap->Alloc(BGUniformSize, DK_UNIFORM_BUF_ALIGNMENT);
     OBJUniformMemory = Gfx::DataHeap->Alloc(OBJUniformSize, DK_UNIFORM_BUF_ALIGNMENT);
@@ -1793,13 +1811,12 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     };
 
     constexpr u32 objMosaicCoordMask = 0x1FF;
-    constexpr u32 objMosaicXShift = 0;
-    constexpr u32 objMosaicYShift = 9;
-    constexpr u32 objMosaicSizeXShift = 18;
-    constexpr u32 objMosaicSizeYShift = 22;
-    constexpr u32 objMosaicHFlip = 1U << 26;
-    constexpr u32 objMosaicVFlip = 1U << 27;
-    constexpr u32 objMosaicEnable = 1U << 28;
+    constexpr u32 objMosaicYShift = 0;
+    constexpr u32 objMosaicSizeYShift = 9;
+    constexpr u32 objMosaicVFlip = 1U << 13;
+    constexpr u32 objMosaicYEnable = 1U << 14;
+    constexpr u32 objMosaicSpriteIDShift = 16;
+    constexpr u32 objMosaicPostXEnable = 1U << 24;
 
     auto packMosaicCoord = [](s32 coord)
     {
@@ -1812,6 +1829,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     int numSpritesTotal = 0;
     int numWindowSpritesTotal = 0;
     bool objMosaicFallback = false;
+    bool objXMosaicFallback = false;
     bool objHasHiResPath = false;
 
     if ((objDispCnt & (1<<12)) == 0)
@@ -2032,17 +2050,20 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             sprite.BaseAddr = addr;
             sprite.StrideShift = strideShift;
             sprite.Meta = meta;
-            sprite.Mosaic = 0;
-            if (spritemode != 2 && !isAffine && (attrib[0] & 0x1000)
-                && (objMosaicSizeX > 0 || objMosaicSizeY > 0))
+            sprite.Mosaic = spritemode != 2
+                ? ((u32)(sprnum + 1) << objMosaicSpriteIDShift)
+                : 0;
+            if (spritemode != 2 && (attrib[0] & 0x1000))
             {
-                sprite.Mosaic = objMosaicEnable
-                    | (packMosaicCoord(spriteX) << objMosaicXShift)
-                    | (packMosaicCoord(y) << objMosaicYShift)
-                    | ((u32)objMosaicSizeX << objMosaicSizeXShift)
-                    | ((u32)objMosaicSizeY << objMosaicSizeYShift)
-                    | ((attrib[1] & 0x1000) ? objMosaicHFlip : 0)
-                    | ((attrib[1] & 0x2000) ? objMosaicVFlip : 0);
+                if (objMosaicSizeX > 0)
+                    sprite.Mosaic |= objMosaicPostXEnable;
+                if (!isAffine && objMosaicSizeY > 0)
+                {
+                    sprite.Mosaic |= objMosaicYEnable
+                        | (packMosaicCoord(y) << objMosaicYShift)
+                        | ((u32)objMosaicSizeY << objMosaicSizeYShift)
+                        | ((attrib[1] & 0x2000) ? objMosaicVFlip : 0);
+                }
             }
             sprite.Depth = depthKey;
             //printf("%d %d %x %x %d %d %d %d %d\n", spriteKind, prio, sprite.BaseAddr, sprite.StrideShift, tilenum, sprite.X, sprite.Y, sprite.Width, sprite.Height);
@@ -2063,14 +2084,18 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             numWindowSpritesTotal += addedSprites;
         if (spritemode != 2 && (attrib[0] & 0x1000)
             && (objMosaicSizeX > 0 || objMosaicSizeY > 0))
+        {
             objMosaicFallback = true;
+            if (objMosaicSizeX > 0)
+                objXMosaicFallback = true;
+        }
         if (spritemode != 2 && isAffine)
             objHasHiResPath = true;
     }
 
     EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine, 256, (u32)linesCount}});
 
-    if (numSpritesTotal > 0)
+    auto bindOBJDrawState = [&]()
     {
         EmuCmdBuf.bindVtxAttribState(
         {
@@ -2089,9 +2114,11 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         EmuCmdBuf.bindUniformBuffer(DkStage_Fragment, 0, Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize);
 
         EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize, 0, sizeof(OBJUniform), &uniform);
-    }
+    };
 
-    
+    if (numSpritesTotal > 0)
+        bindOBJDrawState();
+
     const dk::Shader* vertShaders[spriteKind_Count] =
     {
         &ShaderOBJRegular,
@@ -2118,10 +2145,23 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         &ShaderOBJWindow4bpp,
         &ShaderOBJWindow8bpp
     };
+    const dk::Shader* fragShadersIndexed[spriteKind_Count] =
+    {
+        &ShaderOBJ4bppIndexed,
+        &ShaderOBJ8bppIndexed,
+        &ShaderOBJBitmapIndexed,
+        &ShaderOBJ4bppIndexed,
+        &ShaderOBJ8bppIndexed,
+        &ShaderOBJBitmapIndexed,
+        &ShaderOBJWindow4bpp,
+        &ShaderOBJWindow8bpp,
+        &ShaderOBJWindow4bpp,
+        &ShaderOBJWindow8bpp
+    };
 
     BGOBJRedrawn[CurUnit->Num] |= (1 << 4);
 
-    auto drawOBJLayerAtScale = [&](dk::Image& colorTargetImage, dk::Image& depthTargetImage, u32 renderScale)
+    auto drawOBJLayerAtScale = [&](dk::Image& colorTargetImage, dk::Image& depthTargetImage, u32 renderScale, dk::Image* mosaicIndexTargetImage)
     {
         u32 width = NativeWidth * renderScale;
         u32 height = NativeHeight * renderScale;
@@ -2131,8 +2171,18 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
         dk::ImageView colorTarget{colorTargetImage};
         dk::ImageView depthTarget{depthTargetImage};
-        EmuCmdBuf.bindRenderTargets({&colorTarget}, &depthTarget);
+        if (mosaicIndexTargetImage)
+        {
+            dk::ImageView mosaicIndexTarget{*mosaicIndexTargetImage};
+            EmuCmdBuf.bindRenderTargets({&colorTarget, &mosaicIndexTarget}, &depthTarget);
+        }
+        else
+        {
+            EmuCmdBuf.bindRenderTargets({&colorTarget}, &depthTarget);
+        }
         EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+        if (mosaicIndexTargetImage)
+            EmuCmdBuf.clearColor(1, DkColorMask_R, 0);
 
         if (numSpritesTotal - numWindowSpritesTotal > 0)
         {
@@ -2147,7 +2197,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             {
                 if (numSprites[i] > 0)
                 {
-                    EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {vertShaders[i], fragShaders[i]});
+                    const dk::Shader* fragShader = mosaicIndexTargetImage ? fragShadersIndexed[i] : fragShaders[i];
+                    EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {vertShaders[i], fragShader});
 
                     DkGpuAddr vertexBuffer = UploadBuf.UploadData(EmuCmdBuf, numSprites[i]*sizeof(SpriteSpec), (u8*)sprites[i]);
                     EmuCmdBuf.bindVtxBuffer(0, vertexBuffer, numSprites[i]*sizeof(SpriteSpec));
@@ -2162,7 +2213,44 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         EmuCmdBuf.discardDepthStencil();
     };
 
-    drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1);
+    auto applyOBJMosaicX = [&]()
+    {
+        struct OBJMosaicUniform
+        {
+            u32 MosaicSizeX;
+            u32 pad0, pad1, pad2;
+        } mosaicUniform = {objMosaicSizeX, 0, 0, 0};
+
+        DkViewport viewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
+        EmuCmdBuf.setViewports(0, {viewport, viewport});
+        EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine, NativeWidth, (u32)linesCount}});
+        EmuCmdBuf.bindDepthStencilState(dk::DepthStencilState{});
+        EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, &ShaderOBJMosaicX});
+        EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
+        {
+            dkMakeTextureHandle(descriptorOffset_OBJMosaicScratch + CurUnit->Num, 0),
+            dkMakeTextureHandle(descriptorOffset_OBJMosaicIndex + CurUnit->Num, 0),
+            dkMakeTextureHandle(descriptorOffset_MosaicTable, 0),
+        });
+        EmuCmdBuf.bindUniformBuffer(DkStage_Fragment, 0, Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize);
+        EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize,
+            0, sizeof(mosaicUniform), &mosaicUniform);
+
+        dk::ImageView colorTarget{IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ]};
+        EmuCmdBuf.bindRenderTargets({&colorTarget});
+        EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
+        EmuCmdBuf.barrier(DkBarrier_Fragments, DkInvalidateFlags_Image);
+    };
+
+    if (objXMosaicFallback)
+    {
+        drawOBJLayerAtScale(OBJMosaicScratch[CurUnit->Num], OBJDepth, 1, &OBJMosaicIndex[CurUnit->Num]);
+        applyOBJMosaicX();
+    }
+    else
+    {
+        drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1, nullptr);
+    }
     bool redrawsFullOBJLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
     bool currentLinesHiRes = OBJHiResLinesValid(CurUnit->Num, (u32)firstLine, (u32)linesCount);
     bool canStartHiResOBJ = objHasHiResPath;
@@ -2171,7 +2259,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         && (canStartHiResOBJ || canPreserveHiResOBJ);
     if (canUseHiResOBJ)
     {
-        drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale);
+        drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale, nullptr);
         SetOBJHiResLines(CurUnit->Num, (u32)firstLine, (u32)linesCount, true);
     }
     else
@@ -2194,6 +2282,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
         if (numWindowSpritesTotal > 0)
         {
+            bindOBJDrawState();
+
             EmuCmdBuf.bindColorState(dk::ColorState{}
                 .setLogicOp(DkLogicOp_Or));
 

@@ -14,6 +14,9 @@ layout (location = 1) flat in uvec4 InAddrInfo;
 layout (location = 2) flat in uvec2 InSize;
 
 layout (location = 0) out uint FinalColor;
+#ifdef OBJIndexOutput
+layout (location = 1) out uint OBJMosaicIndex;
+#endif
 
 layout (std140, binding = 0) uniform OBJUniform
 {
@@ -22,13 +25,12 @@ layout (std140, binding = 0) uniform OBJUniform
 };
 
 const uint OBJMosaicCoordMask = 0x1FFU;
-const uint OBJMosaicXShift = 0U;
-const uint OBJMosaicYShift = 9U;
-const uint OBJMosaicSizeXShift = 18U;
-const uint OBJMosaicSizeYShift = 22U;
-const uint OBJMosaicHFlip = 1U << 26U;
-const uint OBJMosaicVFlip = 1U << 27U;
-const uint OBJMosaicEnable = 1U << 28U;
+const uint OBJMosaicYShift = 0U;
+const uint OBJMosaicSizeYShift = 9U;
+const uint OBJMosaicVFlip = 1U << 13U;
+const uint OBJMosaicYEnable = 1U << 14U;
+const uint OBJMosaicSpriteIDShift = 16U;
+const uint OBJMosaicPostXEnable = 1U << 24U;
 
 int DecodeMosaicCoord(uint value)
 {
@@ -41,33 +43,17 @@ int DecodeMosaicCoord(uint value)
 void main()
 {
     ivec2 inSpritePosition = ivec2(InInSpritePosition);
-    if ((InAddrInfo.w & OBJMosaicEnable) != 0U)
+    if ((InAddrInfo.w & OBJMosaicYEnable) != 0U)
     {
-        uint mosaicLevelX = (InAddrInfo.w >> OBJMosaicSizeXShift) & 0xFU;
-        if (mosaicLevelX != 0U)
-        {
-            int spriteX = DecodeMosaicCoord(InAddrInfo.w >> OBJMosaicXShift);
-            int screenX = int(gl_FragCoord.x);
-            int mosaicX = int(texelFetch(MosaicTable, ivec2(screenX, int(mosaicLevelX)), 0).x);
-            int sourceX = mosaicX - spriteX;
-            if ((InAddrInfo.w & OBJMosaicHFlip) != 0U)
-                sourceX = int(InSize.x >> 8) - 1 - sourceX;
-
-            inSpritePosition.x = sourceX * 256;
-        }
-
         uint mosaicLevelY = (InAddrInfo.w >> OBJMosaicSizeYShift) & 0xFU;
-        if (mosaicLevelY != 0U)
-        {
-            int spriteY = DecodeMosaicCoord(InAddrInfo.w >> OBJMosaicYShift);
-            int screenY = int(gl_FragCoord.y);
-            int mosaicY = int(texelFetch(MosaicTable, ivec2(screenY, int(mosaicLevelY)), 0).x);
-            int sourceY = mosaicY - spriteY;
-            if ((InAddrInfo.w & OBJMosaicVFlip) != 0U)
-                sourceY = int(InSize.y >> 8) - 1 - sourceY;
+        int spriteY = DecodeMosaicCoord(InAddrInfo.w >> OBJMosaicYShift);
+        int screenY = int(gl_FragCoord.y);
+        int mosaicY = int(texelFetch(MosaicTable, ivec2(screenY, int(mosaicLevelY)), 0).x);
+        int sourceY = mosaicY - spriteY;
+        if ((InAddrInfo.w & OBJMosaicVFlip) != 0U)
+            sourceY = int(InSize.y >> 8) - 1 - sourceY;
 
-            inSpritePosition.y = sourceY * 256;
-        }
+        inSpritePosition.y = sourceY * 256;
     }
 
     if (uint(inSpritePosition.x) >= InSize.x
@@ -77,6 +63,10 @@ void main()
     int basepixeladdr = int(InAddrInfo.x);
     int yshift = int(InAddrInfo.y);
     uint meta = InAddrInfo.z;
+#ifdef OBJIndexOutput
+    uint spriteID = (InAddrInfo.w >> OBJMosaicSpriteIDShift) & 0xFFU;
+    OBJMosaicIndex = spriteID | (((InAddrInfo.w & OBJMosaicPostXEnable) != 0U) ? 0x100U : 0U);
+#endif
 
     ivec2 position = inSpritePosition >> 11;
     ivec2 tile = (inSpritePosition >> 8) & ivec2(7);
