@@ -348,7 +348,6 @@ void DekoRenderer::Reset()
 
     CaptureLatch = false;
     CaptureCnt = 0;
-    DispCnt = 0;
 
     memset(OAMShadow, 0, sizeof(OAMShadow));
 }
@@ -538,7 +537,6 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             CurUnit->CaptureLatch = true;
             CaptureLatch = true;
             CaptureCnt = CurUnit->CaptureCnt;
-            DispCnt = CurUnit->DispCnt;
         }
         else
         {
@@ -555,13 +553,14 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
         }
         else
         {
+            u32 dispCnt = CurUnit->DispCnt;
             u16* src = NULL;
-            u32 srcvram = (DispCnt >> 18) & 0x3;
+            u32 srcvram = (dispCnt >> 18) & 0x3;
             if (GPU::VRAMMap_LCDC & (1<<srcvram))
                 src = (u16*)GPU::VRAM[srcvram];
 
             u32 srcBaddr = n3dline * NativeWidth;
-            if (((DispCnt >> 16) & 0x3) != 2)
+            if (((dispCnt >> 16) & 0x3) != 2)
                 srcBaddr += ((CaptureCnt >> 26) & 0x3) << 14;
             srcBaddr &= 0xFFFF;
 
