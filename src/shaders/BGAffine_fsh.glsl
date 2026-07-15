@@ -46,6 +46,7 @@ void main()
     ivec4 perLineData = PerLineData[nativePosition.y];
     ivec2 lineBase = perLineData.xy;
 
+#ifndef Mosaic
     if (scale > 1 && nativePosition.y < 191)
     {
         ivec2 nextLineBase = PerLineData[nativePosition.y + 1].xy;
@@ -54,6 +55,7 @@ void main()
         else if (RenderScale == 4U)
             lineBase += ((nextLineBase - lineBase) * subY) / 4;
     }
+#endif
 
     ivec2 xStep = position.x * perLineData.zw;
     if (RenderScale == 2U)
