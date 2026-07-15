@@ -28,6 +28,7 @@ layout (std140, binding = 0) uniform ComposeUniform
 
     uint BGNumMask0, BGNumMask1, BGNumMask2, BGNumMask3;
     uint RenderScale, FinalScale, HiResBGMask, HiResOBJ;
+    uint DirectBitmapFullWhite, pad0, pad1, pad2;
     uvec4 Window[192];
 };
 
@@ -261,10 +262,18 @@ void main()
     finalColorG = layer0G;
 #endif
 #ifdef ShowBitmap
-    uint color = texelFetch(DirectBitmap, nativePosition, 0).r;
+    if (DirectBitmapFullWhite != 0U)
+    {
+        finalColorRB = 0x3F003FU;
+        finalColorG = 0x3FU;
+    }
+    else
+    {
+        uint color = texelFetch(DirectBitmap, nativePosition, 0).r;
 
-    finalColorRB = ((color & 0x1FU) << 1) | ((color & 0x7C00) << 7);
-    finalColorG = (color & 0x3E0U) >> 4;
+        finalColorRB = ((color & 0x1FU) << 1) | ((color & 0x7C00) << 7);
+        finalColorG = (color & 0x3E0U) >> 4;
+    }
 #ifdef ComposeBGOBJ
     DisplayCapture = finalColorRB | (finalColorG << 8) | 0xFF000000U;
 #endif

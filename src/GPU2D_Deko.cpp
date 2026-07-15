@@ -64,6 +64,18 @@ DekoRenderer::DekoRenderer() :
             IntermedFramebufferMemory.Offset + intermedFbLayout.getSize() * i);
     }
 
+    OBJMosaicScratchMemory = Gfx::TextureHeap->Alloc(intermedFbLayout.getSize() * 2, intermedFbLayout.getAlignment());
+    OBJMosaicIndexMemory = Gfx::TextureHeap->Alloc(intermedFbLayout.getSize() * 2, intermedFbLayout.getAlignment());
+    for (int i = 0; i < 2; i++)
+    {
+        OBJMosaicScratch[i].initialize(intermedFbLayout,
+            Gfx::TextureHeap->MemBlock,
+            OBJMosaicScratchMemory.Offset + intermedFbLayout.getSize() * i);
+        OBJMosaicIndex[i].initialize(intermedFbLayout,
+            Gfx::TextureHeap->MemBlock,
+            OBJMosaicIndexMemory.Offset + intermedFbLayout.getSize() * i);
+    }
+
     dk::ImageLayout hiResIntermedFbLayout;
     dk::ImageLayoutMaker{Gfx::Device}
         .setDimensions(FinalFramebufferWidth, FinalFramebufferHeight)
@@ -202,6 +214,8 @@ DekoRenderer::DekoRenderer() :
     {
         imageDescriptors[descriptorOffset_Palettes+i].initialize(dk::ImageView{PaletteTextures[i]});
         imageDescriptors[descriptorOffset_DirectBitmap+i].initialize(dk::ImageView{DirectBitmapTexture[i]});
+        imageDescriptors[descriptorOffset_OBJMosaicScratch+i].initialize(dk::ImageView{OBJMosaicScratch[i]});
+        imageDescriptors[descriptorOffset_OBJMosaicIndex+i].initialize(dk::ImageView{OBJMosaicIndex[i]});
         imageDescriptors[descriptorOffset_OBJWindow+i].initialize(dk::ImageView{OBJWindow[i]});
     }
     imageDescriptors[descriptorOffset_3DFramebuffer].initialize(dk::ImageView{_3DFramebuffer});
@@ -233,8 +247,12 @@ DekoRenderer::DekoRenderer() :
     Gfx::LoadShader("romfs:/shaders/OBJ4bpp_fsh.dksh", ShaderOBJ4bpp);
     Gfx::LoadShader("romfs:/shaders/OBJ8bpp_fsh.dksh", ShaderOBJ8bpp);
     Gfx::LoadShader("romfs:/shaders/OBJBitmap_fsh.dksh", ShaderOBJBitmap);
+    Gfx::LoadShader("romfs:/shaders/OBJ4bppIndexed_fsh.dksh", ShaderOBJ4bppIndexed);
+    Gfx::LoadShader("romfs:/shaders/OBJ8bppIndexed_fsh.dksh", ShaderOBJ8bppIndexed);
+    Gfx::LoadShader("romfs:/shaders/OBJBitmapIndexed_fsh.dksh", ShaderOBJBitmapIndexed);
     Gfx::LoadShader("romfs:/shaders/OBJWindow4bpp_fsh.dksh", ShaderOBJWindow4bpp);
     Gfx::LoadShader("romfs:/shaders/OBJWindow8bpp_fsh.dksh", ShaderOBJWindow8bpp);
+    Gfx::LoadShader("romfs:/shaders/OBJMosaicX_fsh.dksh", ShaderOBJMosaicX);
 
     BGUniformMemory = Gfx::DataHeap->Alloc(BGUniformSize, DK_UNIFORM_BUF_ALIGNMENT);
     OBJUniformMemory = Gfx::DataHeap->Alloc(OBJUniformSize, DK_UNIFORM_BUF_ALIGNMENT);
@@ -316,18 +334,24 @@ void DekoRenderer::Reset()
         LastForceBlank[i] = false;
         DirectBitmapNeeded[i] = false;
         LastBGMosaicSizeX[i] = 0;
+        LastBGMosaicSizeY[i] = 0;
         LastBGMosaicYMax[i] = 0;
         LastOBJMosaicSizeX[i] = 0;
         LastOBJMosaicSizeY[i] = 0;
         BGOBJRedrawn[i] = 0;
         BGHiResValid[i] = 0;
         OBJHiResValid[i] = false;
-        OBJHiResFallback[i] = false;
+        OBJHiResScale[i] = 0;
+        ClearOBJHiResLines(i);
+        OBJCompositionDirty[i] = false;
         OBJWindowEmpty[i] = true;
+        // Force the next OBJ pass to clear the GPU texture before compose samples it.
+        OBJWindowNeedsClear[i] = true;
         ComposeRegions[i].clear();
 
         for (int j = 0; j < 4; j++)
         {
+            ClearBGHiResLines(i, j);
             LastBGCnt[i][j] = 0;
             LastBGXPos[i][j] = 0;
             LastBGYPos[i][j] = 0;
@@ -348,9 +372,143 @@ void DekoRenderer::Reset()
 
     CaptureLatch = false;
     CaptureCnt = 0;
-    DispCnt = 0;
+    memset(DisplayCaptureSourceB, 0, sizeof(DisplayCaptureSourceB));
+    memset(DisplayCaptureLine, 0xFF, sizeof(DisplayCaptureLine));
+    memset(DisplayCaptureSourceBAddr, 0, sizeof(DisplayCaptureSourceBAddr));
+    memset(DisplayCaptureSourceBVRAMBank, 0xFF, sizeof(DisplayCaptureSourceBVRAMBank));
 
     memset(OAMShadow, 0, sizeof(OAMShadow));
+}
+
+void DekoRenderer::ClearBGHiResLines(u32 unit, u32 bg)
+{
+    memset(BGHiResLineValid[unit][bg], 0, sizeof(BGHiResLineValid[unit][bg]));
+    BGHiResScale[unit][bg] = 0;
+    BGHiResValid[unit] &= ~(1U << bg);
+}
+
+void DekoRenderer::SetBGHiResLines(u32 unit, u32 bg, u32 firstLine, u32 linesCount, bool valid)
+{
+    if (firstLine >= NativeHeight || linesCount == 0)
+        return;
+
+    if (firstLine + linesCount > NativeHeight)
+        linesCount = NativeHeight - firstLine;
+
+    if (valid && BGHiResScale[unit][bg] != 0 && BGHiResScale[unit][bg] != _3DRenderScale)
+        ClearBGHiResLines(unit, bg);
+
+    for (u32 line = firstLine; line < firstLine + linesCount; line++)
+    {
+        u64 bit = 1ULL << (line & 63);
+        u64& word = BGHiResLineValid[unit][bg][line >> 6];
+        if (valid)
+            word |= bit;
+        else
+            word &= ~bit;
+    }
+
+    bool anyValid = false;
+    for (u32 word = 0; word < HiResLineValidWords; word++)
+        anyValid |= BGHiResLineValid[unit][bg][word] != 0;
+
+    if (anyValid)
+    {
+        BGHiResValid[unit] |= 1U << bg;
+        if (valid)
+            BGHiResScale[unit][bg] = (u8)_3DRenderScale;
+    }
+    else
+    {
+        BGHiResValid[unit] &= ~(1U << bg);
+        BGHiResScale[unit][bg] = 0;
+    }
+}
+
+bool DekoRenderer::BGHiResLinesValid(u32 unit, u32 bg, u32 firstLine, u32 linesCount) const
+{
+    if ((BGHiResValid[unit] & (1U << bg)) == 0 || firstLine >= NativeHeight || linesCount == 0)
+        return false;
+
+    if (BGHiResScale[unit][bg] != _3DRenderScale)
+        return false;
+
+    if (firstLine + linesCount > NativeHeight)
+        return false;
+
+    for (u32 line = firstLine; line < firstLine + linesCount; line++)
+    {
+        u64 bit = 1ULL << (line & 63);
+        if ((BGHiResLineValid[unit][bg][line >> 6] & bit) == 0)
+            return false;
+    }
+
+    return true;
+}
+
+void DekoRenderer::ClearOBJHiResLines(u32 unit)
+{
+    memset(OBJHiResLineValid[unit], 0, sizeof(OBJHiResLineValid[unit]));
+    OBJHiResValid[unit] = false;
+    OBJHiResScale[unit] = 0;
+}
+
+void DekoRenderer::SetOBJHiResLines(u32 unit, u32 firstLine, u32 linesCount, bool valid)
+{
+    if (firstLine >= NativeHeight || linesCount == 0)
+        return;
+
+    if (firstLine + linesCount > NativeHeight)
+        linesCount = NativeHeight - firstLine;
+
+    if (valid && OBJHiResScale[unit] != 0 && OBJHiResScale[unit] != _3DRenderScale)
+        ClearOBJHiResLines(unit);
+
+    for (u32 line = firstLine; line < firstLine + linesCount; line++)
+    {
+        u64 bit = 1ULL << (line & 63);
+        u64& word = OBJHiResLineValid[unit][line >> 6];
+        if (valid)
+            word |= bit;
+        else
+            word &= ~bit;
+    }
+
+    bool anyValid = false;
+    for (u32 word = 0; word < HiResLineValidWords; word++)
+        anyValid |= OBJHiResLineValid[unit][word] != 0;
+
+    OBJHiResValid[unit] = anyValid;
+    if (anyValid)
+    {
+        if (valid)
+            OBJHiResScale[unit] = (u8)_3DRenderScale;
+    }
+    else
+    {
+        OBJHiResScale[unit] = 0;
+    }
+}
+
+bool DekoRenderer::OBJHiResLinesValid(u32 unit, u32 firstLine, u32 linesCount) const
+{
+    if (!OBJHiResValid[unit] || firstLine >= NativeHeight || linesCount == 0)
+        return false;
+
+    if (OBJHiResScale[unit] != _3DRenderScale)
+        return false;
+
+    if (firstLine + linesCount > NativeHeight)
+        return false;
+
+    for (u32 line = firstLine; line < firstLine + linesCount; line++)
+    {
+        u64 bit = 1ULL << (line & 63);
+        if ((OBJHiResLineValid[unit][line >> 6] & bit) == 0)
+            return false;
+    }
+
+    return true;
 }
 
 void DekoRenderer::DrawScanline(u32 line, Unit* unit)
@@ -364,7 +522,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
 
     bool forceblank = false;
 
-    if (line > 192) forceblank = true;
+    if (line > NativeHeight) forceblank = true;
     if (CurUnit->Num && !CurUnit->Enabled) forceblank = true;
 
     OpenCmdBuf();
@@ -372,7 +530,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
     bool uploadBarrier = false;
     {
         u32 bgmask = 0;
-        bool compositionDirty = n3dline == 0;
+        bool compositionDirty = n3dline == 0 || OBJCompositionDirty[num];
         ComposeRegion composeRegion = {0};
 
         for (int i = 0; i < 4; i++)
@@ -410,12 +568,13 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             }
         }
     
+        bool outputForceBlankChanged = LastForceBlank[num] != forceblank;
         if (LastBlendCnt[num] != CurUnit->BlendCnt
             || LastMasterBrightness[num] != CurUnit->MasterBrightness
             || LastEVA[num] != CurUnit->EVA
             || LastEVB[num] != CurUnit->EVB
             || LastEVY[num] != CurUnit->EVY
-            || LastForceBlank[num] != forceblank)
+            || outputForceBlankChanged)
         {
             LastBlendCnt[num] = CurUnit->BlendCnt;
             LastMasterBrightness[num] = CurUnit->MasterBrightness;
@@ -425,6 +584,8 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             LastForceBlank[num] = forceblank;
             compositionDirty = true;
         }
+        if (outputForceBlankChanged)
+            bgmask = 0xF;
 
         // Bit 3 switches main-engine BG0 between 2D and 3D layer sources.
         if ((LastDispCnt[num] ^ CurUnit->DispCnt) & 0xFF030F8F)
@@ -433,7 +594,8 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             compositionDirty = true;
 
         bool mosaicChanged = LastBGMosaicYMax[num] != CurUnit->BGMosaicYMax
-            || LastBGMosaicSizeX[num] != CurUnit->BGMosaicSize[0];
+            || LastBGMosaicSizeX[num] != CurUnit->BGMosaicSize[0]
+            || LastBGMosaicSizeY[num] != CurUnit->BGMosaicSize[1];
         for (int i = 0; i < 4; i++)
         {
             if (((LastBGCnt[num][i] ^ CurUnit->BGCnt[i]) & 0xFFFC) || (LastBGCnt[num][i] & 0x0040 && mosaicChanged))
@@ -510,44 +672,81 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             compositionDirty = true;
         }
 
+        if (bgmask)
+            compositionDirty = true;
+
         LastDispCnt[num] = CurUnit->DispCnt;
         for (int i = 0; i < 4; i++)
             LastBGCnt[num][i] = CurUnit->BGCnt[i];
         LastBGMosaicSizeX[num] = CurUnit->BGMosaicSize[0];
+        LastBGMosaicSizeY[num] = CurUnit->BGMosaicSize[1];
         LastBGMosaicYMax[num] = CurUnit->BGMosaicYMax;
 
         if (compositionDirty)
         {
-            composeRegion.ForceBlank = forceblank;
-            composeRegion.DispCnt = CurUnit->DispCnt;
-            for (int i = 0; i < 4; i++)
-                composeRegion.BGCnt[i] = CurUnit->BGCnt[i];
-            composeRegion.BlendCnt = CurUnit->BlendCnt;
-            composeRegion.MasterBrightness = CurUnit->MasterBrightness;
-            composeRegion.EVA = CurUnit->EVA;
-            composeRegion.EVB = CurUnit->EVB;
-            composeRegion.EVY = CurUnit->EVY;
+            FillinCurComposeRegion(composeRegion, forceblank);
             ComposeRegions[num].push_back(composeRegion);
+            OBJCompositionDirty[num] = false;
         }
     }
 
-    if (n3dline == 0 && CurUnit->Num == 0 && !forceblank)
+    if (n3dline == 0 && CurUnit->Num == 0)
     {
-        if (CurUnit->CaptureCnt & (1 << 31))
+        CurUnit->CaptureLatch = false;
+        CaptureLatch = false;
+        if (!forceblank && (CurUnit->CaptureCnt & (1 << 31)))
         {
             CurUnit->CaptureLatch = true;
             CaptureLatch = true;
             CaptureCnt = CurUnit->CaptureCnt;
-            DispCnt = CurUnit->DispCnt;
-        }
-        else
-        {
-            CaptureLatch = false;
+            memset(DisplayCaptureLine, 0xFF, sizeof(DisplayCaptureLine));
+            memset(DisplayCaptureSourceBAddr, 0, sizeof(DisplayCaptureSourceBAddr));
+            memset(DisplayCaptureSourceBVRAMBank, 0xFF, sizeof(DisplayCaptureSourceBVRAMBank));
         }
     }
 
-    if (CurUnit->Num == 0 && CaptureLatch && (CaptureCnt & (1<<25)) && ((CaptureCnt >> 29) & 0x3) != 0)
-        memcpy(&DispFIFOFramebuffer[n3dline*NativeWidth], CurUnit->DispFIFOBuffer, NativeWidth*2);
+    if (CurUnit->Num == 0 && CaptureLatch)
+        DisplayCaptureLine[n3dline] = line;
+
+    if (CurUnit->Num == 0 && CaptureLatch && ((CaptureCnt >> 29) & 0x3) != 0)
+    {
+        u16* dst = &DisplayCaptureSourceB[n3dline*NativeWidth];
+        DisplayCaptureSourceBAddr[n3dline] = 0;
+        DisplayCaptureSourceBVRAMBank[n3dline] = 0xFF;
+        if (CaptureCnt & (1<<25))
+        {
+            memcpy(dst, CurUnit->DispFIFOBuffer, NativeWidth*2);
+        }
+        else
+        {
+            u32 dispCnt = CurUnit->DispCnt;
+            u16* src = NULL;
+            u32 srcvram = (dispCnt >> 18) & 0x3;
+            if (GPU::VRAMMap_LCDC & (1<<srcvram))
+                src = (u16*)GPU::VRAM[srcvram];
+
+            u32 srcBaddr = line * NativeWidth;
+            if (((dispCnt >> 16) & 0x3) != 2)
+                srcBaddr += ((CaptureCnt >> 26) & 0x3) << 14;
+            srcBaddr &= 0xFFFF;
+            DisplayCaptureSourceBAddr[n3dline] = srcBaddr;
+
+            if (src)
+            {
+                DisplayCaptureSourceBVRAMBank[n3dline] = srcvram;
+                u32 firstCopy = NativeWidth;
+                if (srcBaddr + firstCopy > 0x10000)
+                    firstCopy = 0x10000 - srcBaddr;
+                memcpy(dst, &src[srcBaddr], firstCopy*2);
+                if (firstCopy < NativeWidth)
+                    memcpy(&dst[firstCopy], src, (NativeWidth - firstCopy)*2);
+            }
+            else
+            {
+                memset(dst, 0, NativeWidth*2);
+            }
+        }
+    }
 
     /*if (CurUnit->Num == 0)
     {
@@ -566,7 +765,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
         switch (dispmode)
         {
         case 0:
-            memset(&DirectBitmap[num][line*256], 0xFF, 256*2);
+            memset(&DirectBitmap[num][n3dline*256], 0xFF, 256*2);
             DirectBitmapNeeded[num] = true;
             break;
         case 2:
@@ -578,27 +777,35 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
                     u16* vram = (u16*)GPU::VRAM[vrambank];
                     vram = &vram[line * 256];
 
-                    memcpy(&DirectBitmap[num][line*256], vram, 256*2);
+                    memcpy(&DirectBitmap[num][n3dline*256], vram, 256*2);
                 }
                 else
                 {
-                    memset(&DirectBitmap[num][line*256], 0, 256*2);
+                    memset(&DirectBitmap[num][n3dline*256], 0, 256*2);
                 }
             }
             break;
         case 3:
             DirectBitmapNeeded[num] = true;
-            memcpy(&DirectBitmap[num][line*256], CurUnit->DispFIFOBuffer, 256*2);
+            memcpy(&DirectBitmap[num][n3dline*256], CurUnit->DispFIFOBuffer, 256*2);
             break;
         }
     }
     else
     {
         DirectBitmapNeeded[num] = true;
-        memset(&DirectBitmap[num][line*256], 0xFF, 256*2);
+        memset(&DirectBitmap[num][n3dline*256], 0xFF, 256*2);
     }
 
-    DrawScanline_BGOBJ(line);
+    if (!forceblank)
+    {
+        DrawScanline_BGOBJ(line, n3dline);
+    }
+    else
+    {
+        for (u32 i = 0; i < 4; i++)
+            BGState[num][i] = bgState_Disable;
+    }
 
     for (u32 i = 0; i < 4; i++)
     {
@@ -693,8 +900,8 @@ void DekoRenderer::DrawSprites(u32 line, Unit* unit)
         GPU::OAMDirty &= ~(1 << num);
     }
 
-    // OBJ address and palette mode bits affect the generated sprite layer.
-    const u32 objDispCntMask = 0x80700070;
+    // OBJ enable, address, and palette mode bits affect the generated sprite layer.
+    const u32 objDispCntMask = 0x80701070;
     bool objFmtChanged = (LastOBJDispCnt[num] ^ CurUnit->DispCnt) & objDispCntMask;
     bool objMosaicChanged = LastOBJMosaicSizeX[num] != CurUnit->OBJMosaicSize[0]
         || LastOBJMosaicSizeY[num] != CurUnit->OBJMosaicSize[1];
@@ -771,30 +978,14 @@ void DekoRenderer::DoCapture()
         return;
 
     u16* dst = (u16*)GPU::VRAM[dstvram];
-    u32 dstaddr = (((CaptureCnt >> 18) & 0x3) << 14);
+    u32 captureBaseAddr = (((CaptureCnt >> 18) & 0x3) << 14);
 
     u8* srcA = Gfx::DataHeap->CpuAddr<u8>(DisplayCaptureMemory);
 
-    u32 srcBaddr = 0;
-    u16* srcB = NULL;
+    u32 source = (CaptureCnt >> 29) & 0x3;
+    u16* srcB = source != 0 ? DisplayCaptureSourceB : NULL;
 
-    if (CaptureCnt & (1<<25))
-    {
-        srcB = DispFIFOFramebuffer;
-        srcBaddr = 0;
-    }
-    else
-    {
-        u32 srcvram = (DispCnt >> 18) & 0x3;
-        if (GPU::VRAMMap_LCDC & (1<<srcvram))
-            srcB = (u16*)GPU::VRAM[srcvram];
-
-        if (((DispCnt >> 16) & 0x3) != 2)
-            srcBaddr += ((CaptureCnt >> 26) & 0x3) << 14;
-    }
-
-    dstaddr &= 0xFFFF;
-    srcBaddr &= 0xFFFF;
+    captureBaseAddr &= 0xFFFF;
 
     static_assert(GPU::VRAMDirtyGranularity == 512, "");
     auto markCaptureDirty = [&](u32 dstpos, u32 pixels)
@@ -817,15 +1008,59 @@ void DekoRenderer::DoCapture()
             byteAddr = 0;
         }
     };
-    markCaptureDirty(dstaddr, width*height);
+    markCaptureDirty(captureBaseAddr, width*height);
+
+    auto getCaptureDstAddr = [&](u32 outputLine, u32& dstaddr)
+    {
+        u32 captureLine = DisplayCaptureLine[outputLine];
+        if (captureLine >= height)
+            return false;
+
+        dstaddr = (captureBaseAddr + captureLine * width) & 0xFFFF;
+        return true;
+    };
+
+    u64 captureWritten[0x10000 / 64] = {};
+    auto isCaptureWritten = [&](u32 pos)
+    {
+        pos &= 0xFFFF;
+        return (captureWritten[pos >> 6] & (1ULL << (pos & 63))) != 0;
+    };
+    auto markCaptureWritten = [&](u32 dstpos, u32 pixels)
+    {
+        dstpos &= 0xFFFF;
+        while (pixels > 0)
+        {
+            u32 bit = dstpos & 63;
+            u32 amount = 64 - bit;
+            u32 bankLeft = 0x10000 - dstpos;
+            if (amount > pixels) amount = pixels;
+            if (amount > bankLeft) amount = bankLeft;
+
+            u64 mask = amount == 64 ? ~0ULL : ((1ULL << amount) - 1ULL) << bit;
+            captureWritten[dstpos >> 6] |= mask;
+
+            dstpos = (dstpos + amount) & 0xFFFF;
+            pixels -= amount;
+        }
+    };
+    auto loadSourceBPixel = [&](u32 line, u32 x)
+    {
+        if (DisplayCaptureSourceBVRAMBank[line] == dstvram)
+        {
+            u32 vramPos = (DisplayCaptureSourceBAddr[line] + x) & 0xFFFF;
+            if (isCaptureWritten(vramPos))
+                return dst[vramPos];
+        }
+
+        return DisplayCaptureSourceB[line*NativeWidth + x];
+    };
 
     u32 eva = CaptureCnt & 0x1F;
     u32 evb = (CaptureCnt >> 8) & 0x1F;
 
     if (eva > 16) eva = 16;
     if (evb > 16) evb = 16;
-    u32 source = (CaptureCnt >> 29) & 0x3;
-
     if (source >= 2)
     {
         if (!srcB)
@@ -839,43 +1074,45 @@ void DekoRenderer::DoCapture()
 
     //printf("capturing %d %dx%d to %d (eva %d | evb %d) %p %p\n", source, width, height, dstvram, eva, evb, srcA, srcB);
 
-    auto copyCapturePixels = [&](u32& dstpos, u16* src, u32 srcpos, u32 count)
+    auto blendCapturePixel = [&](u32& dstpos, u32 line, u32 x)
     {
-        while (count > 0)
-        {
-            u32 dstLeft = 0x10000 - dstpos;
-            u32 srcLeft = 0x10000 - srcpos;
-            u32 copyAmount = count;
-            if (copyAmount > dstLeft) copyAmount = dstLeft;
-            if (copyAmount > srcLeft) copyAmount = srcLeft;
+        u8* pixelA = &srcA[(x + line * NativeWidth) * 4];
+        bool alphaA = pixelA[3] != 0;
+        u16 pixelB = loadSourceBPixel(line, x);
+        bool alphaB = (pixelB & 0x8000) != 0;
 
-            memcpy(&dst[dstpos], &src[srcpos], copyAmount*2);
-            dstpos = (dstpos + copyAmount) & 0xFFFF;
-            srcpos = (srcpos + copyAmount) & 0xFFFF;
-            count -= copyAmount;
-        }
-    };
+        u32 rA = alphaA ? (pixelA[0] >> 1) : 0;
+        u32 gA = alphaA ? (pixelA[1] >> 1) : 0;
+        u32 bA = alphaA ? (pixelA[2] >> 1) : 0;
 
-    auto clearCapturePixels = [&](u32& dstpos, u32 count)
-    {
-        while (count > 0)
-        {
-            u32 dstLeft = 0x10000 - dstpos;
-            u32 clearAmount = count;
-            if (clearAmount > dstLeft) clearAmount = dstLeft;
+        u32 rB = alphaB ? (pixelB & 0x1F) : 0;
+        u32 gB = alphaB ? ((pixelB >> 5) & 0x1F) : 0;
+        u32 bB = alphaB ? ((pixelB >> 10) & 0x1F) : 0;
 
-            memset(&dst[dstpos], 0, clearAmount*2);
-            dstpos = (dstpos + clearAmount) & 0xFFFF;
-            count -= clearAmount;
-        }
+        u32 r = ((rA * eva) + (rB * evb)) >> 4;
+        u32 g = ((gA * eva) + (gB * evb)) >> 4;
+        u32 b = ((bA * eva) + (bB * evb)) >> 4;
+        u32 alpha = ((eva != 0 && alphaA) || (evb != 0 && alphaB)) ? 0x8000 : 0;
+
+        if (r > 0x1F) r = 0x1F;
+        if (g > 0x1F) g = 0x1F;
+        if (b > 0x1F) b = 0x1F;
+
+        dst[dstpos] = r | (g << 5) | (b << 10) | alpha;
+        markCaptureWritten(dstpos, 1);
+        dstpos = (dstpos + 1) & 0xFFFF;
     };
 
     switch (source)
     {
     case 0: // source A
         {
-            for (u32 j = 0; j < height; j++)
+            for (u32 j = 0; j < NativeHeight; j++)
             {
+                u32 dstaddr;
+                if (!getCaptureDstAddr(j, dstaddr))
+                    continue;
+
                 for (u32 i = 0; i < width; i += 16)
                 {
                     uint8x16x4_t pixels = vld4q_u8(&srcA[(i + j * 256) * 4]);
@@ -886,7 +1123,9 @@ void DekoRenderer::DoCapture()
                     uint8x16_t alpha = vtstq_u8(pixels.val[3], pixels.val[3]);
                     high = vbslq_u8(vdupq_n_u8(0x80), alpha, high);
 
+                    u32 writePos = dstaddr;
                     vst2q_u8((u8*)&dst[dstaddr], {low, high});
+                    markCaptureWritten(writePos, 16);
                     dstaddr = (dstaddr + 16) & 0xFFFF;
                 }
             }
@@ -895,13 +1134,44 @@ void DekoRenderer::DoCapture()
 
     case 1: // source B
         {
-            for (u32 j = 0; j < height; j++)
+            for (u32 j = 0; j < NativeHeight; j++)
             {
-                u32 rowSrcBaddr = (srcBaddr + j*NativeWidth) & 0xFFFF;
-                if (srcB)
-                    copyCapturePixels(dstaddr, srcB, rowSrcBaddr, width);
-                else
-                    clearCapturePixels(dstaddr, width);
+                u32 dstaddr;
+                if (!getCaptureDstAddr(j, dstaddr))
+                    continue;
+
+                for (u32 i = 0; i < width;)
+                {
+                    u32 copyAmount = width - i;
+                    u32 dstLeft = 0x10000 - dstaddr;
+                    if (copyAmount > dstLeft) copyAmount = dstLeft;
+
+                    if (DisplayCaptureSourceBVRAMBank[j] == dstvram)
+                    {
+                        for (u32 k = 0; k < copyAmount; k++)
+                        {
+                            dst[dstaddr] = loadSourceBPixel(j, i + k);
+                            markCaptureWritten(dstaddr, 1);
+                            dstaddr = (dstaddr + 1) & 0xFFFF;
+                        }
+                    }
+                    else if (srcB)
+                    {
+                        u32 writePos = dstaddr;
+                        memcpy(&dst[dstaddr], &srcB[j*NativeWidth + i], copyAmount*2);
+                        markCaptureWritten(writePos, copyAmount);
+                        dstaddr = (dstaddr + copyAmount) & 0xFFFF;
+                    }
+                    else
+                    {
+                        u32 writePos = dstaddr;
+                        memset(&dst[dstaddr], 0, copyAmount*2);
+                        markCaptureWritten(writePos, copyAmount);
+                        dstaddr = (dstaddr + copyAmount) & 0xFFFF;
+                    }
+
+                    i += copyAmount;
+                }
             }
         }
         break;
@@ -913,13 +1183,24 @@ void DekoRenderer::DoCapture()
             {
                 uint8x16_t evaMask = vdupq_n_u8(eva ? 0xFF : 0);
                 uint8x16_t evbMask = vdupq_n_u8(evb ? 0xFF : 0);
-                for (u32 j = 0; j < height; j++)
+                for (u32 j = 0; j < NativeHeight; j++)
                 {
-                    u32 rowSrcBaddr = (srcBaddr + j*NativeWidth) & 0xFFFF;
+                    u32 dstaddr;
+                    if (!getCaptureDstAddr(j, dstaddr))
+                        continue;
+
+                    bool sourceBMayOverlap = DisplayCaptureSourceBVRAMBank[j] == dstvram;
+                    if (sourceBMayOverlap)
+                    {
+                        for (u32 i = 0; i < width; i++)
+                            blendCapturePixel(dstaddr, j, i);
+                        continue;
+                    }
+
                     for (u32 i = 0; i < width; i += 16)
                     {
                         uint8x16x4_t pixelsA = vld4q_u8(&srcA[(i + j * 256) * 4]);
-                        uint8x16x2_t pixelsB = vld2q_u8((u8*)&srcB[rowSrcBaddr]);
+                        uint8x16x2_t pixelsB = vld2q_u8((u8*)&srcB[j*NativeWidth + i]);
                         uint8x16_t alphaA = vtstq_u8(pixelsA.val[3], pixelsA.val[3]);
                         uint8x16_t alphaB = vtstq_u8(pixelsB.val[1], vdupq_n_u8(0x80));
 
@@ -962,9 +1243,10 @@ void DekoRenderer::DoCapture()
                         finalVal.val[0] = vorrq_u8(finalR, vshlq_n_u8(finalG, 5));
                         finalVal.val[1] = vbslq_u8(vdupq_n_u8(0x7F), vorrq_u8(vshlq_n_u8(finalB, 2), vshrq_n_u8(finalG, 3)), alpha);
 
+                        u32 writePos = dstaddr;
                         vst2q_u8((u8*)&dst[dstaddr], finalVal);
+                        markCaptureWritten(writePos, 16);
 
-                        rowSrcBaddr = (rowSrcBaddr + 16) & 0xFFFF;
                         dstaddr = (dstaddr + 16) & 0xFFFF;
                     }
                 }
@@ -972,8 +1254,12 @@ void DekoRenderer::DoCapture()
             else
             {
                 uint8x16_t evaMask = vdupq_n_u8(eva ? 0xFF : 0);
-                for (u32 j = 0; j < height; j++)
+                for (u32 j = 0; j < NativeHeight; j++)
                 {
+                    u32 dstaddr;
+                    if (!getCaptureDstAddr(j, dstaddr))
+                        continue;
+
                     for (u32 i = 0; i < width; i += 16)
                     {
                         uint8x16x4_t pixelsA = vld4q_u8(&srcA[(i + j * 256) * 4]);
@@ -1002,7 +1288,9 @@ void DekoRenderer::DoCapture()
                         finalVal.val[0] = vorrq_u8(finalR, vshlq_n_u8(finalG, 5));
                         finalVal.val[1] = vbslq_u8(vdupq_n_u8(0x7F), vorrq_u8(vshlq_n_u8(finalB, 2), vshrq_n_u8(finalG, 3)), alpha);
 
+                        u32 writePos = dstaddr;
                         vst2q_u8((u8*)&dst[dstaddr], finalVal);
+                        markCaptureWritten(writePos, 16);
                         dstaddr = (dstaddr + 16) & 0xFFFF;
                     }
                 }
@@ -1017,19 +1305,33 @@ void DekoRenderer::VBlankEnd(Unit* unitA, Unit* unitB)
     
 }
 
-void DekoRenderer::DrawScanline_BGOBJ(u32 line)
+void DekoRenderer::FillinCurComposeRegion(ComposeRegion& out, bool forceblank)
+{
+    out.ForceBlank = forceblank;
+    out.DispCnt = CurUnit->DispCnt;
+    for (int i = 0; i < 4; i++)
+        out.BGCnt[i] = CurUnit->BGCnt[i];
+    out.BlendCnt = CurUnit->BlendCnt;
+    out.MasterBrightness = CurUnit->MasterBrightness;
+    out.EVA = CurUnit->EVA;
+    out.EVB = CurUnit->EVB;
+    out.EVY = CurUnit->EVY;
+}
+
+void DekoRenderer::DrawScanline_BGOBJ(u32 line, u32 outputLine)
 {
     // forced blank disables BG/OBJ compositing
     if (CurUnit->DispCnt & (1<<7))
     {
-        memset(&DirectBitmap[CurUnit->Num][line*256], 0xFF, 256*2);
+        memset(&DirectBitmap[CurUnit->Num][outputLine*256], 0xFF, 256*2);
+        DirectBitmapNeeded[CurUnit->Num] = true;
 
         for (int i = 0; i < 4; i++)
             BGState[CurUnit->Num][i] = bgState_Disable;
         return;
     }
 
-    u32* window = &ComposeUniforms[CurUnit->Num].Window[line*4];
+    u32* window = &ComposeUniforms[CurUnit->Num].Window[outputLine*4];
 
     window[0] = (u32)CurUnit->WinCnt[2] | ((u32)CurUnit->WinCnt[1] << 16);
     window[1] = (u32)CurUnit->WinCnt[0] | ((u32)CurUnit->WinCnt[3] << 16);
@@ -1072,14 +1374,14 @@ void DekoRenderer::DrawScanline_BGOBJ(u32 line)
 
     switch (CurUnit->DispCnt & 0x7)
     {
-    case 0: DrawScanlineBGMode<0>(line); break;
-    case 1: DrawScanlineBGMode<1>(line); break;
-    case 2: DrawScanlineBGMode<2>(line); break;
-    case 3: DrawScanlineBGMode<3>(line); break;
-    case 4: DrawScanlineBGMode<4>(line); break;
-    case 5: DrawScanlineBGMode<5>(line); break;
-    case 6: DrawScanlineBGMode6(line); break;
-    case 7: DrawScanlineBGMode7(line); break;
+    case 0: DrawScanlineBGMode<0>(line, outputLine); break;
+    case 1: DrawScanlineBGMode<1>(line, outputLine); break;
+    case 2: DrawScanlineBGMode<2>(line, outputLine); break;
+    case 3: DrawScanlineBGMode<3>(line, outputLine); break;
+    case 4: DrawScanlineBGMode<4>(line, outputLine); break;
+    case 5: DrawScanlineBGMode<5>(line, outputLine); break;
+    case 6: DrawScanlineBGMode6(line, outputLine); break;
+    case 7: DrawScanlineBGMode7(line, outputLine); break;
     }
 
     if (CurUnit->BGMosaicY >= CurUnit->BGMosaicYMax)
@@ -1094,17 +1396,17 @@ void DekoRenderer::DrawScanline_BGOBJ(u32 line)
 }
 
 template<u32 bgmode>
-void DekoRenderer::DrawScanlineBGMode(u32 line)
+void DekoRenderer::DrawScanlineBGMode(u32 line, u32 outputLine)
 {
     u32 dispCnt = CurUnit->DispCnt;
     if (dispCnt & 0x0800)
     {
         if (bgmode >= 3)
-            DrawBG_Extended(line, 3);
+            DrawBG_Extended(outputLine, 3);
         else if (bgmode >= 1)
-            DrawBG_Affine(line, 3);
+            DrawBG_Affine(outputLine, 3);
         else
-            DrawBG_Text(line, 3);
+            DrawBG_Text(line, outputLine, 3);
     }
     else
     {
@@ -1113,11 +1415,11 @@ void DekoRenderer::DrawScanlineBGMode(u32 line)
     if (dispCnt & 0x0400)
     {
         if (bgmode == 5)
-            DrawBG_Extended(line, 2);
+            DrawBG_Extended(outputLine, 2);
         else if (bgmode == 4 || bgmode == 2)
-            DrawBG_Affine(line, 2);
+            DrawBG_Affine(outputLine, 2);
         else
-            DrawBG_Text(line, 2);
+            DrawBG_Text(line, outputLine, 2);
     }
     else
     {
@@ -1125,7 +1427,7 @@ void DekoRenderer::DrawScanlineBGMode(u32 line)
     }
     if (dispCnt & 0x0200)
     {
-        DrawBG_Text(line, 1);
+        DrawBG_Text(line, outputLine, 1);
     }
     else
     {
@@ -1134,9 +1436,9 @@ void DekoRenderer::DrawScanlineBGMode(u32 line)
     if (dispCnt & 0x0100)
     {
         if (!CurUnit->Num && (dispCnt & 0x8))
-            DrawBG_3D(line);
+            DrawBG_3D(outputLine);
         else
-            DrawBG_Text(line, 0);
+            DrawBG_Text(line, outputLine, 0);
     }
     else
     {
@@ -1144,7 +1446,7 @@ void DekoRenderer::DrawScanlineBGMode(u32 line)
     }
 }
 
-void DekoRenderer::DrawScanlineBGMode6(u32 line)
+void DekoRenderer::DrawScanlineBGMode6(u32 line, u32 outputLine)
 {
     u32 dispCnt = CurUnit->DispCnt;
 
@@ -1153,7 +1455,7 @@ void DekoRenderer::DrawScanlineBGMode6(u32 line)
 
     if (dispCnt & 0x0400)
     {
-        DrawBG_Large(line);
+        DrawBG_Large(outputLine);
     }
     else
     {
@@ -1162,7 +1464,7 @@ void DekoRenderer::DrawScanlineBGMode6(u32 line)
 
     if (dispCnt & 0x0100 && !CurUnit->Num && dispCnt & 0x8)
     {
-        DrawBG_3D(line);
+        DrawBG_3D(outputLine);
     }
     else
     {
@@ -1170,14 +1472,14 @@ void DekoRenderer::DrawScanlineBGMode6(u32 line)
     }
 }
 
-void DekoRenderer::DrawScanlineBGMode7(u32 line)
+void DekoRenderer::DrawScanlineBGMode7(u32 line, u32 outputLine)
 {
     u32 dispCnt = CurUnit->DispCnt;
     // mode 7 only has text-mode BG0 and BG1
 
     if (dispCnt & 0x0200)
     {
-        DrawBG_Text(line, 1);
+        DrawBG_Text(line, outputLine, 1);
     }
     else
     {
@@ -1187,9 +1489,9 @@ void DekoRenderer::DrawScanlineBGMode7(u32 line)
     if (dispCnt & 0x0100)
     {
         if (!CurUnit->Num && (dispCnt & 0x8))
-            DrawBG_3D(line);
+            DrawBG_3D(outputLine);
         else
-            DrawBG_Text(line, 0);
+            DrawBG_Text(line, outputLine, 0);
     }
     else
     {
@@ -1200,11 +1502,11 @@ void DekoRenderer::DrawScanlineBGMode7(u32 line)
     BGState[CurUnit->Num][3] = bgState_Disable;
 }
 
-void DekoRenderer::DrawBG_3D(u32 line)
+void DekoRenderer::DrawBG_3D(u32 outputLine)
 {
     BGState[CurUnit->Num][0] = bgState_3D;
 
-    /*u32* targetLine = &_3DFramebuffer[line * 256];
+    /*u32* targetLine = &_3DFramebuffer[outputLine * 256];
     for (u32 i = 0; i < 256; i += 16)
     {
         uint8x16x4_t pixels = vld4q_u8((u8*)&_3DLine[i]);
@@ -1215,7 +1517,7 @@ void DekoRenderer::DrawBG_3D(u32 line)
     }*/
 }
 
-void DekoRenderer::DrawBG_Text(u32 line, u32 bgnum)
+void DekoRenderer::DrawBG_Text(u32 line, u32 outputLine, u32 bgnum)
 {
     u16 bgcnt = CurUnit->BGCnt[bgnum];
 
@@ -1278,12 +1580,12 @@ void DekoRenderer::DrawBG_Text(u32 line, u32 bgnum)
         BGState[CurUnit->Num][bgnum] = bgState_Text4bpp;
     }
 
-    uniform.PerLineData[line*4+0] = xoff;
-    uniform.PerLineData[line*4+1] = yoff & 0x7;
-    uniform.PerLineData[line*4+2] = tilemapaddr;
+    uniform.PerLineData[outputLine*4+0] = xoff;
+    uniform.PerLineData[outputLine*4+1] = yoff & 0x7;
+    uniform.PerLineData[outputLine*4+2] = tilemapaddr;
 }
 
-void DekoRenderer::DrawBG_Affine(u32 line, u32 bgnum)
+void DekoRenderer::DrawBG_Affine(u32 outputLine, u32 bgnum)
 {
     u16 bgcnt = CurUnit->BGCnt[bgnum];
 
@@ -1319,10 +1621,10 @@ void DekoRenderer::DrawBG_Affine(u32 line, u32 bgnum)
         rotY -= (CurUnit->BGMosaicY * rotD);
     }
 
-    uniform.PerLineData[line*4+0] = (u32)rotX;
-    uniform.PerLineData[line*4+1] = (u32)rotY;
-    uniform.PerLineData[line*4+2] = (u32)(s32)rotA;
-    uniform.PerLineData[line*4+3] = (u32)(s32)rotC;
+    uniform.PerLineData[outputLine*4+0] = (u32)rotX;
+    uniform.PerLineData[outputLine*4+1] = (u32)rotY;
+    uniform.PerLineData[outputLine*4+2] = (u32)(s32)rotA;
+    uniform.PerLineData[outputLine*4+3] = (u32)(s32)rotC;
 
     uniform.Affine.BGVRAMMask = CurUnit->Num ? 0x1FFFF : 0x7FFFF;
 
@@ -1340,7 +1642,7 @@ void DekoRenderer::DrawBG_Affine(u32 line, u32 bgnum)
     BGState[CurUnit->Num][bgnum] = bgState_Affine;
 }
 
-void DekoRenderer::DrawBG_Extended(u32 line, u32 bgnum)
+void DekoRenderer::DrawBG_Extended(u32 outputLine, u32 bgnum)
 {
     u16 bgcnt = CurUnit->BGCnt[bgnum];
 
@@ -1364,10 +1666,10 @@ void DekoRenderer::DrawBG_Extended(u32 line, u32 bgnum)
 
     BGUniform& uniform = BGTextUniforms[CurUnit->Num][bgnum];
 
-    uniform.PerLineData[line*4+0] = (u32)rotX;
-    uniform.PerLineData[line*4+1] = (u32)rotY;
-    uniform.PerLineData[line*4+2] = (u32)(s32)rotA;
-    uniform.PerLineData[line*4+3] = (u32)(s32)rotC;
+    uniform.PerLineData[outputLine*4+0] = (u32)rotX;
+    uniform.PerLineData[outputLine*4+1] = (u32)rotY;
+    uniform.PerLineData[outputLine*4+2] = (u32)(s32)rotA;
+    uniform.PerLineData[outputLine*4+3] = (u32)(s32)rotC;
 
     uniform.Affine.BGVRAMMask = CurUnit->Num ? 0x1FFFF : 0x7FFFF;
 
@@ -1444,7 +1746,7 @@ void DekoRenderer::DrawBG_Extended(u32 line, u32 bgnum)
     }
 }
 
-void DekoRenderer::DrawBG_Large(u32 line)
+void DekoRenderer::DrawBG_Large(u32 outputLine)
 {
     u16 bgcnt = CurUnit->BGCnt[2];
     BGUniform& uniform = BGTextUniforms[CurUnit->Num][2];
@@ -1489,10 +1791,10 @@ void DekoRenderer::DrawBG_Large(u32 line)
         rotY -= (CurUnit->BGMosaicY * rotD);
     }
 
-    uniform.PerLineData[line*4+0] = (u32)rotX;
-    uniform.PerLineData[line*4+1] = (u32)rotY;
-    uniform.PerLineData[line*4+2] = (u32)(s32)rotA;
-    uniform.PerLineData[line*4+3] = (u32)(s32)rotC;
+    uniform.PerLineData[outputLine*4+0] = (u32)rotX;
+    uniform.PerLineData[outputLine*4+1] = (u32)rotY;
+    uniform.PerLineData[outputLine*4+2] = (u32)(s32)rotA;
+    uniform.PerLineData[outputLine*4+3] = (u32)(s32)rotC;
 
     uniform.Affine.BGVRAMMask = CurUnit->Num ? 0x1FFFF : 0x7FFFF;
 
@@ -1509,6 +1811,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         //printf("skipping obj\n");
         OBJBatchFirstLine[CurUnit->Num] = curline;
         OBJBatchLinesCount[CurUnit->Num] = 0;
+        if (curline < NativeHeight)
+            OBJCompositionDirty[CurUnit->Num] = true;
         return;
     }
 
@@ -1517,6 +1821,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
     u16* oam = (u16*)&OAMShadow[CurUnit->Num ? 0x400 : 0];
     u32 objDispCnt = LastOBJDispCnt[CurUnit->Num];
+    u8 objMosaicSizeX = LastOBJMosaicSizeX[CurUnit->Num];
+    u8 objMosaicSizeY = LastOBJMosaicSizeY[CurUnit->Num];
 
     enum
     {
@@ -1536,15 +1842,74 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     struct SpriteSpec
     {
         s16 X, Y, Width, Height;
-        u32 BaseAddr, StrideShift, Meta;
+        u32 BaseAddr, StrideShift, Meta, Mosaic;
         float Depth;
     };
 
+    constexpr u32 objMosaicCoordMask = 0x1FF;
+    constexpr u32 objMosaicYShift = 0;
+    constexpr u32 objMosaicSizeYShift = 9;
+    constexpr u32 objMosaicVFlip = 1U << 13;
+    constexpr u32 objMosaicYEnable = 1U << 14;
+    constexpr u32 objMosaicAffineY = 1U << 15;
+    constexpr u32 objMosaicSpriteIDShift = 16;
+    constexpr u32 objMosaicPostXEnable = 1U << 24;
+    constexpr u32 objMosaicAffineParamShift = 25;
+
+    auto packMosaicCoord = [](s32 coord)
+    {
+        return (u32)coord & objMosaicCoordMask;
+    };
+
     int numSprites[spriteKind_Count] = {};
-    SpriteSpec sprites[spriteKind_Count][128];
+    static const int MaxSpriteSpecsPerKind = 256;
+    SpriteSpec sprites[spriteKind_Count][MaxSpriteSpecsPerKind];
     int numSpritesTotal = 0;
     int numWindowSpritesTotal = 0;
     bool objMosaicFallback = false;
+    bool objXMosaicFallback = false;
+    bool objHasHiResPath = false;
+
+    if ((objDispCnt & (1<<12)) == 0)
+    {
+        u32 unit = CurUnit->Num;
+        DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
+        EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
+        DkScissor objBatchScissor = {0, (u32)firstLine, NativeWidth, (u32)linesCount};
+        EmuCmdBuf.setScissors(0, {objBatchScissor});
+
+        dk::ImageView objTarget{IntermedFramebuffers[fb_Count * unit + fb_OBJ]};
+        EmuCmdBuf.bindRenderTargets({&objTarget});
+        EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+        SetOBJHiResLines(unit, (u32)firstLine, (u32)linesCount, false);
+        BGOBJRedrawn[unit] |= (1 << 4);
+
+        if (OBJWindowNeedsClear[unit] || !OBJWindowEmpty[unit])
+        {
+            DkScissor objWindowScissor = OBJWindowNeedsClear[unit]
+                ? DkScissor{0, 0, NativeWidth, NativeHeight}
+                : DkScissor{0, (u32)firstLine, NativeWidth, (u32)linesCount};
+            EmuCmdBuf.setScissors(0, {objWindowScissor});
+
+            dk::ImageView objWindow{OBJWindow[unit]};
+            EmuCmdBuf.bindRenderTargets({&objWindow});
+            EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+            if (OBJWindowNeedsClear[unit])
+                EmuCmdBuf.setScissors(0, {objBatchScissor});
+            BGOBJRedrawn[unit] |= (1 << 5);
+            if (OBJWindowNeedsClear[unit] || (firstLine == 0 && linesCount == (s32)NativeHeight))
+                OBJWindowEmpty[unit] = true;
+            OBJWindowNeedsClear[unit] = false;
+        }
+
+        EmuCmdBuf.barrier(DkBarrier_Fragments, DkInvalidateFlags_Image);
+
+        OBJBatchFirstLine[unit] += OBJBatchLinesCount[unit];
+        OBJBatchLinesCount[unit] = 0;
+        if ((u32)curline < NativeHeight)
+            OBJCompositionDirty[unit] = true;
+        return;
+    }
 
     OBJUniform uniform;
     uniform.VRAMMask = CurUnit->Num ? 0x1FFFF : 0x3FFFF;
@@ -1582,6 +1947,14 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         u32 sizeparam = (attrib[0] >> 14) | ((attrib[1] & 0xC000) >> 12);
         u32 width = spritewidth[sizeparam];
         u32 height = spriteheight[sizeparam];
+        u32 displayWidth = width;
+        u32 displayHeight = height;
+        bool doubleSizeAffine = isAffine && (attrib[0] & 0x0200);
+        if (doubleSizeAffine)
+        {
+            displayWidth <<= 1;
+            displayHeight <<= 1;
+        }
 
         u32 addr, strideShift = 0;
         int spriteKind;
@@ -1592,7 +1965,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
         if (isAffine)
         {
-            if (attrib[0] & 0x0200)
+            if (doubleSizeAffine)
                 strideShift |= 0x800000U;
 
             strideShift |= ((attrib[1] >> 9) & 0x1F) << 24;
@@ -1653,11 +2026,6 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         {
             meta |= 0x800000; // add paletted flag
 
-            if (spritemode == 2)
-            {
-                // OBJ window
-                numWindowSpritesTotal++;
-            }
             if (spritemode == 1)
             {
                 // semi transparent
@@ -1702,63 +2070,110 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
                     : (spritemode == 2 ? spriteKind_RegularWindow4bpp : spriteKind_Regular4bpp);
             }
         }
-        SpriteSpec& sprite = sprites[spriteKind][numSprites[spriteKind]];
+        s16 spriteX = (s16)((s32)(attrib[1] << 23) >> 23);
+        s32 spriteY = attrib[0] & 0xFF;
+        s32 primaryY = spriteY >= 192 ? spriteY - 256 : spriteY;
 
-        sprite.X = (s16)((s32)(attrib[1] << 23) >> 23);
-        sprite.Y = attrib[0] & 0xFF;
-        // not entirely accurate (it doesn't handle sprites coming off on the other side)
-        if (sprite.Y >= 192)
-            sprite.Y = sprite.Y - 256;
-
-        sprite.Width = spritewidth[sizeparam];
-        sprite.Height = spriteheight[sizeparam];
-        sprite.BaseAddr = addr;
-        sprite.StrideShift = strideShift;
-        sprite.Meta = meta;
-        sprite.Depth = depthKey;
-        //printf("%d %d %x %x %d %d %d %d %d\n", spriteKind, prio, sprite.BaseAddr, sprite.StrideShift, tilenum, sprite.X, sprite.Y, sprite.Width, sprite.Height);
-
-        if (sprite.Y >= firstLine + linesCount)
+        if (spriteX + (s32)displayWidth <= 0)
             continue;
-        if (sprite.Y + sprite.Height <= firstLine)
+        if (spriteX >= 256)
             continue;
 
-        if (sprite.X + sprite.Width <= 0)
-            continue;
-        if (sprite.X >= 256)
+        auto addVisibleSprite = [&](s32 y)
+        {
+            if (y >= firstLine + linesCount)
+                return 0;
+            if (y + (s32)displayHeight <= firstLine)
+                return 0;
+            if (numSprites[spriteKind] >= MaxSpriteSpecsPerKind)
+                return 0;
+
+            SpriteSpec& sprite = sprites[spriteKind][numSprites[spriteKind]];
+
+            sprite.X = spriteX;
+            sprite.Y = y;
+            sprite.Width = spritewidth[sizeparam];
+            sprite.Height = spriteheight[sizeparam];
+            sprite.BaseAddr = addr;
+            sprite.StrideShift = strideShift;
+            sprite.Meta = meta;
+            sprite.Mosaic = spritemode != 2
+                ? ((u32)(sprnum + 1) << objMosaicSpriteIDShift)
+                : 0;
+            if (spritemode != 2 && (attrib[0] & 0x1000))
+            {
+                if (objMosaicSizeX > 0)
+                    sprite.Mosaic |= objMosaicPostXEnable;
+                if (objMosaicSizeY > 0)
+                {
+                    sprite.Mosaic |= objMosaicYEnable
+                        | ((u32)objMosaicSizeY << objMosaicSizeYShift);
+                    if (isAffine)
+                    {
+                        sprite.Mosaic |= objMosaicAffineY
+                            | (((attrib[1] >> 9) & 0x1F) << objMosaicAffineParamShift);
+                    }
+                    else
+                    {
+                        sprite.Mosaic |= (packMosaicCoord(y) << objMosaicYShift)
+                            | ((attrib[1] & 0x2000) ? objMosaicVFlip : 0);
+                    }
+                }
+            }
+            sprite.Depth = depthKey;
+            //printf("%d %d %x %x %d %d %d %d %d\n", spriteKind, prio, sprite.BaseAddr, sprite.StrideShift, tilenum, sprite.X, sprite.Y, sprite.Width, sprite.Height);
+
+            numSprites[spriteKind]++;
+            numSpritesTotal++;
+            return 1;
+        };
+
+        int addedSprites = addVisibleSprite(primaryY);
+        if (spriteY < 192 && spriteY + (s32)displayHeight > 256)
+            addedSprites += addVisibleSprite(spriteY - 256);
+
+        if (addedSprites == 0)
             continue;
 
+        if (spritemode == 2)
+            numWindowSpritesTotal += addedSprites;
         if (spritemode != 2 && (attrib[0] & 0x1000)
-            && (CurUnit->OBJMosaicSize[0] > 0 || CurUnit->OBJMosaicSize[1] > 0))
+            && (objMosaicSizeX > 0 || objMosaicSizeY > 0))
+        {
             objMosaicFallback = true;
-
-        numSprites[spriteKind]++;
-        numSpritesTotal++;
+            if (objMosaicSizeX > 0)
+                objXMosaicFallback = true;
+        }
+        if (spritemode != 2 && isAffine)
+            objHasHiResPath = true;
     }
 
     EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine, 256, (u32)linesCount}});
 
-    if (numSpritesTotal > 0)
+    auto bindOBJDrawState = [&]()
     {
         EmuCmdBuf.bindVtxAttribState(
         {
             DkVtxAttribState{0, 0, offsetof(SpriteSpec, X), DkVtxAttribSize_4x16, DkVtxAttribType_Sint, 0},
-            DkVtxAttribState{0, 0, offsetof(SpriteSpec, BaseAddr), DkVtxAttribSize_3x32, DkVtxAttribType_Uint, 0},
+            DkVtxAttribState{0, 0, offsetof(SpriteSpec, BaseAddr), DkVtxAttribSize_4x32, DkVtxAttribType_Uint, 0},
             DkVtxAttribState{0, 0, offsetof(SpriteSpec, Depth), DkVtxAttribSize_1x32, DkVtxAttribType_Float, 0},
         });
         EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
         {
             dkMakeTextureHandle(descriptorOffset_VRAM8 + textureVRAM_AOBJ + CurUnit->Num, 0),
             dkMakeTextureHandle(descriptorOffset_VRAM16 + textureVRAM_AOBJ + CurUnit->Num, 0),
+            dkMakeTextureHandle(descriptorOffset_MosaicTable, 0),
         });
 
         EmuCmdBuf.bindUniformBuffer(DkStage_Vertex, 0, Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize);
         EmuCmdBuf.bindUniformBuffer(DkStage_Fragment, 0, Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize);
 
         EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize, 0, sizeof(OBJUniform), &uniform);
-    }
+    };
 
-    
+    if (numSpritesTotal > 0)
+        bindOBJDrawState();
+
     const dk::Shader* vertShaders[spriteKind_Count] =
     {
         &ShaderOBJRegular,
@@ -1785,10 +2200,23 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         &ShaderOBJWindow4bpp,
         &ShaderOBJWindow8bpp
     };
+    const dk::Shader* fragShadersIndexed[spriteKind_Count] =
+    {
+        &ShaderOBJ4bppIndexed,
+        &ShaderOBJ8bppIndexed,
+        &ShaderOBJBitmapIndexed,
+        &ShaderOBJ4bppIndexed,
+        &ShaderOBJ8bppIndexed,
+        &ShaderOBJBitmapIndexed,
+        &ShaderOBJWindow4bpp,
+        &ShaderOBJWindow8bpp,
+        &ShaderOBJWindow4bpp,
+        &ShaderOBJWindow8bpp
+    };
 
     BGOBJRedrawn[CurUnit->Num] |= (1 << 4);
 
-    auto drawOBJLayerAtScale = [&](dk::Image& colorTargetImage, dk::Image& depthTargetImage, u32 renderScale)
+    auto drawOBJLayerAtScale = [&](dk::Image& colorTargetImage, dk::Image& depthTargetImage, u32 renderScale, dk::Image* mosaicIndexTargetImage)
     {
         u32 width = NativeWidth * renderScale;
         u32 height = NativeHeight * renderScale;
@@ -1798,8 +2226,18 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
         dk::ImageView colorTarget{colorTargetImage};
         dk::ImageView depthTarget{depthTargetImage};
-        EmuCmdBuf.bindRenderTargets({&colorTarget}, &depthTarget);
+        if (mosaicIndexTargetImage)
+        {
+            dk::ImageView mosaicIndexTarget{*mosaicIndexTargetImage};
+            EmuCmdBuf.bindRenderTargets({&colorTarget, &mosaicIndexTarget}, &depthTarget);
+        }
+        else
+        {
+            EmuCmdBuf.bindRenderTargets({&colorTarget}, &depthTarget);
+        }
         EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+        if (mosaicIndexTargetImage)
+            EmuCmdBuf.clearColor(1, DkColorMask_R, 0);
 
         if (numSpritesTotal - numWindowSpritesTotal > 0)
         {
@@ -1814,7 +2252,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             {
                 if (numSprites[i] > 0)
                 {
-                    EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {vertShaders[i], fragShaders[i]});
+                    const dk::Shader* fragShader = mosaicIndexTargetImage ? fragShadersIndexed[i] : fragShaders[i];
+                    EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {vertShaders[i], fragShader});
 
                     DkGpuAddr vertexBuffer = UploadBuf.UploadData(EmuCmdBuf, numSprites[i]*sizeof(SpriteSpec), (u8*)sprites[i]);
                     EmuCmdBuf.bindVtxBuffer(0, vertexBuffer, numSprites[i]*sizeof(SpriteSpec));
@@ -1829,36 +2268,85 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         EmuCmdBuf.discardDepthStencil();
     };
 
-    drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1);
-    OBJHiResFallback[CurUnit->Num] |= objMosaicFallback;
-    bool redrawsFullOBJLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
-    bool canUseHiResOBJ = _3DRenderScale > 1 && !OBJHiResFallback[CurUnit->Num]
-        && (OBJHiResValid[CurUnit->Num] || redrawsFullOBJLayer);
-    if (canUseHiResOBJ)
+    auto applyOBJMosaicX = [&]()
     {
-        drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale);
-        OBJHiResValid[CurUnit->Num] = true;
+        struct OBJMosaicUniform
+        {
+            u32 MosaicSizeX;
+            u32 pad0, pad1, pad2;
+        } mosaicUniform = {objMosaicSizeX, 0, 0, 0};
+
+        DkViewport viewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
+        EmuCmdBuf.setViewports(0, {viewport, viewport});
+        EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine, NativeWidth, (u32)linesCount}});
+        EmuCmdBuf.bindDepthStencilState(dk::DepthStencilState{});
+        EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, &ShaderOBJMosaicX});
+        EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
+        {
+            dkMakeTextureHandle(descriptorOffset_OBJMosaicScratch + CurUnit->Num, 0),
+            dkMakeTextureHandle(descriptorOffset_OBJMosaicIndex + CurUnit->Num, 0),
+            dkMakeTextureHandle(descriptorOffset_MosaicTable, 0),
+        });
+        EmuCmdBuf.bindUniformBuffer(DkStage_Fragment, 0, Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize);
+        EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(OBJUniformMemory), OBJUniformSize,
+            0, sizeof(mosaicUniform), &mosaicUniform);
+
+        dk::ImageView colorTarget{IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ]};
+        EmuCmdBuf.bindRenderTargets({&colorTarget});
+        EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
+        EmuCmdBuf.barrier(DkBarrier_Fragments, DkInvalidateFlags_Image);
+    };
+
+    if (objXMosaicFallback)
+    {
+        drawOBJLayerAtScale(OBJMosaicScratch[CurUnit->Num], OBJDepth, 1, &OBJMosaicIndex[CurUnit->Num]);
+        applyOBJMosaicX();
     }
     else
     {
-        OBJHiResValid[CurUnit->Num] = false;
+        drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1, nullptr);
+    }
+    bool redrawsFullOBJLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
+    bool currentLinesHiRes = OBJHiResLinesValid(CurUnit->Num, (u32)firstLine, (u32)linesCount);
+    bool canStartHiResOBJ = objHasHiResPath;
+    bool canPreserveHiResOBJ = currentLinesHiRes && !redrawsFullOBJLayer;
+    bool canUseHiResOBJ = _3DRenderScale > 1 && !objMosaicFallback
+        && (canStartHiResOBJ || canPreserveHiResOBJ);
+    if (canUseHiResOBJ)
+    {
+        drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale, nullptr);
+        SetOBJHiResLines(CurUnit->Num, (u32)firstLine, (u32)linesCount, true);
+    }
+    else
+    {
+        SetOBJHiResLines(CurUnit->Num, (u32)firstLine, (u32)linesCount, false);
     }
 
     DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
     EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
-    EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine, NativeWidth, (u32)linesCount}});
+    DkScissor objWindowBatchScissor = {0, (u32)firstLine, NativeWidth, (u32)linesCount};
+    EmuCmdBuf.setScissors(0, {objWindowBatchScissor});
 
-    if (numWindowSpritesTotal > 0 || !OBJWindowEmpty[CurUnit->Num])
+    if (numWindowSpritesTotal > 0 || OBJWindowNeedsClear[CurUnit->Num] || !OBJWindowEmpty[CurUnit->Num])
     {
+        bool clearFullOBJWindow = OBJWindowNeedsClear[CurUnit->Num];
         dk::ImageView colorTarget{OBJWindow[CurUnit->Num]};
+        EmuCmdBuf.bindDepthStencilState(dk::DepthStencilState{});
         EmuCmdBuf.bindRenderTargets({&colorTarget});
+        if (clearFullOBJWindow)
+            EmuCmdBuf.setScissors(0, {DkScissor{0, 0, NativeWidth, NativeHeight}});
         EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+        if (clearFullOBJWindow)
+            EmuCmdBuf.setScissors(0, {objWindowBatchScissor});
 
         BGOBJRedrawn[CurUnit->Num] |= (1 << 5);
-        OBJWindowEmpty[CurUnit->Num] = false;
+        OBJWindowNeedsClear[CurUnit->Num] = false;
 
         if (numWindowSpritesTotal > 0)
         {
+            OBJWindowEmpty[CurUnit->Num] = false;
+            bindOBJDrawState();
+
             EmuCmdBuf.bindColorState(dk::ColorState{}
                 .setLogicOp(DkLogicOp_Or));
 
@@ -1878,7 +2366,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
             EmuCmdBuf.bindColorState(dk::ColorState{});
         }
-        else if (firstLine == 0 && linesCount == (s32)NativeHeight)
+        else if (clearFullOBJWindow || (firstLine == 0 && linesCount == (s32)NativeHeight))
         {
             OBJWindowEmpty[CurUnit->Num] = true;
         }
@@ -1888,6 +2376,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
     OBJBatchFirstLine[CurUnit->Num] += OBJBatchLinesCount[CurUnit->Num];
     OBJBatchLinesCount[CurUnit->Num] = 0;
+    if ((u32)curline < NativeHeight)
+        OBJCompositionDirty[CurUnit->Num] = true;
 }
 
 void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
@@ -1936,6 +2426,14 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
             assert(linesCount > 0);
             assert(firstLine != -1);
             int state = BGState[CurUnit->Num][i];
+            bool bgMosaicFallback = (LastBGCnt[CurUnit->Num][i] & 0x0040)
+                && (LastBGMosaicSizeX[CurUnit->Num] > 0 || LastBGMosaicSizeY[CurUnit->Num] > 0);
+            bool redrawsFullBGLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
+            bool bgHasHiResPath = state >= bgState_Affine;
+            bool currentLinesHiRes = BGHiResLinesValid(CurUnit->Num, i, (u32)firstLine, (u32)linesCount);
+            bool canStartHiResBG = bgHasHiResPath && !bgMosaicFallback;
+            bool canPreserveHiResBG = currentLinesHiRes && !redrawsFullBGLayer && !bgMosaicFallback;
+            bool canUseHiResBG = _3DRenderScale > 1 && (canStartHiResBG || canPreserveHiResBG);
             if (state >= bgState_Text4bpp)
             {
                 BGOBJRedrawn[CurUnit->Num] |= (1 << i);
@@ -1989,14 +2487,14 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
 
                 drawBGAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_BG0 + i], 1);
 
-                if (_3DRenderScale > 1)
+                if (canUseHiResBG)
                 {
                     drawBGAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i], (u32)_3DRenderScale);
-                    BGHiResValid[CurUnit->Num] |= 1U << i;
+                    SetBGHiResLines(CurUnit->Num, i, (u32)firstLine, (u32)linesCount, true);
                 }
                 else
                 {
-                    BGHiResValid[CurUnit->Num] &= ~(1U << i);
+                    SetBGHiResLines(CurUnit->Num, i, (u32)firstLine, (u32)linesCount, false);
                 }
             }
             else
@@ -2017,14 +2515,14 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
                 };
 
                 clearBGAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_BG0 + i], 1);
-                if (_3DRenderScale > 1)
+                if (canUseHiResBG)
                 {
                     clearBGAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i], (u32)_3DRenderScale);
-                    BGHiResValid[CurUnit->Num] |= 1U << i;
+                    SetBGHiResLines(CurUnit->Num, i, (u32)firstLine, (u32)linesCount, true);
                 }
                 else
                 {
-                    BGHiResValid[CurUnit->Num] &= ~(1U << i);
+                    SetBGHiResLines(CurUnit->Num, i, (u32)firstLine, (u32)linesCount, false);
                 }
             }
 
@@ -2093,6 +2591,7 @@ void DekoRenderer::ComposeBGOBJ()
         u32 dispmode = region.DispCnt >> 16;
         dispmode &= (CurUnit->Num ? 0x1 : 0x3);
         bool showDirectBitmap = dispmode != 1 || (region.DispCnt & (1<<7)) || region.ForceBlank;
+        bool directBitmapFullWhite = dispmode == 0 || (region.DispCnt & (1<<7)) || region.ForceBlank;
 
         if (capture)
         {
@@ -2102,14 +2601,14 @@ void DekoRenderer::ComposeBGOBJ()
         {
             shader = showDirectBitmap ? &ShaderComposeBGOBJDirectBitmapOnly : &ShaderComposeBGOBJ;
         }
-        EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, shader});
+        dk::Shader* captureShader = ((region.DispCnt & (1<<7)) || region.ForceBlank)
+            ? &ShaderComposeBGOBJShowBitmap
+            : &ShaderComposeBGOBJ;
 
         u32 outputWidth = NativeWidth * _3DRenderScale;
         u32 outputHeight = NativeHeight * _3DRenderScale;
         DkViewport finalViewport = {0.f, 0.f, (float)outputWidth, (float)outputHeight, 0.f, 1.f};
-        EmuCmdBuf.setViewports(0, {finalViewport, finalViewport});
-        DkScissor scissor = {0, firstLine * (u32)_3DRenderScale, outputWidth, region.LinesCount * (u32)_3DRenderScale};
-        EmuCmdBuf.setScissors(0, {scissor, scissor});
+        DkViewport captureViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
         //printf("compositing region %d %d\n", firstLine, region.LinesCount);
 
         u32 bgOrder[4];
@@ -2120,7 +2619,6 @@ void DekoRenderer::ComposeBGOBJ()
                     bgOrder[n++] = j;
 
         ComposeUniform& composeUniform = ComposeUniforms[CurUnit->Num];
-        int textureHandleIdx[4];
         int captureTextureHandleIdx[4];
         composeUniform.HiResBGMask = 0;
         composeUniform.HiResOBJ = 0;
@@ -2146,34 +2644,17 @@ void DekoRenderer::ComposeBGOBJ()
 
             if (!(region.DispCnt & (1<<(bgOrder[i]+8))))
             {
-                textureHandleIdx[i] = descriptorOffset_DisabledBG;
                 captureTextureHandleIdx[i] = descriptorOffset_DisabledBG;
             }
             else if (bgOrder[i] == 0 && CurUnit->Num == 0 && region.DispCnt & (1<<3))
             {
-                textureHandleIdx[i] = _3DRenderScale > 1
-                    ? descriptorOffset_3DFramebufferHiRes
-                    : descriptorOffset_3DFramebuffer;
                 captureTextureHandleIdx[i] = descriptorOffset_3DFramebuffer;
-                if (_3DRenderScale > 1)
-                    composeUniform.HiResBGMask |= 1U << i;
             }
             else
             {
                 int nativeTextureHandleIdx = descriptorOffset_IntermedFb +
                     fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
                 captureTextureHandleIdx[i] = nativeTextureHandleIdx;
-
-                if (_3DRenderScale > 1 && (BGHiResValid[CurUnit->Num] & (1U << bgOrder[i])))
-                {
-                    textureHandleIdx[i] = descriptorOffset_IntermedFbHiRes +
-                        fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
-                    composeUniform.HiResBGMask |= 1U << i;
-                }
-                else
-                {
-                    textureHandleIdx[i] = nativeTextureHandleIdx;
-                }
             }
 
             composeUniform.BGNumMask[i] = 1 << bgOrder[i];
@@ -2182,22 +2663,38 @@ void DekoRenderer::ComposeBGOBJ()
         int nativeObjTextureHandleIdx = region.DispCnt & (1<<12)
             ? (descriptorOffset_IntermedFb + fb_OBJ + fb_Count * CurUnit->Num)
             : descriptorOffset_DisabledBG;
-        int objTextureHandleIdx = nativeObjTextureHandleIdx;
-        if (_3DRenderScale > 1 && OBJHiResValid[CurUnit->Num] && (region.DispCnt & (1<<12)))
-        {
-            objTextureHandleIdx = descriptorOffset_IntermedFbHiRes + fb_OBJ + fb_Count * CurUnit->Num;
-            composeUniform.HiResOBJ = 1;
-        }
 
         assert(n == 4);
-        EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
+
+        auto getLineHiResBGMask = [&](u32 line)
         {
-            dkMakeTextureHandle(textureHandleIdx[0], 0),
-            dkMakeTextureHandle(textureHandleIdx[1], 0),
-            dkMakeTextureHandle(textureHandleIdx[2], 0),
-            dkMakeTextureHandle(textureHandleIdx[3], 0),
-            dkMakeTextureHandle(objTextureHandleIdx, 0),
-        });
+            u32 mask = 0;
+            if (_3DRenderScale <= 1 || showDirectBitmap)
+                return mask;
+
+            for (int i = 0; i < 4; i++)
+            {
+                if (!(region.DispCnt & (1<<(bgOrder[i]+8))))
+                    continue;
+
+                if (bgOrder[i] == 0 && CurUnit->Num == 0 && region.DispCnt & (1<<3))
+                {
+                    mask |= 1U << i;
+                }
+                else if (BGHiResLinesValid(CurUnit->Num, bgOrder[i], line, 1))
+                {
+                    mask |= 1U << i;
+                }
+            }
+
+            return mask;
+        };
+
+        auto getLineHiResOBJ = [&](u32 line)
+        {
+            return _3DRenderScale > 1 && !showDirectBitmap && (region.DispCnt & (1<<12))
+                && OBJHiResLinesValid(CurUnit->Num, line, 1);
+        };
 
         composeUniform.MasterBrightnessFactor = region.MasterBrightness & 0x1F;
         composeUniform.MasterBrightnessMode = region.MasterBrightness >> 14;
@@ -2205,6 +2702,8 @@ void DekoRenderer::ComposeBGOBJ()
             composeUniform.MasterBrightnessMode = 0;
         if (composeUniform.MasterBrightnessFactor > 16)
             composeUniform.MasterBrightnessFactor = 16;
+        if (dispmode == 0 || region.ForceBlank)
+            composeUniform.MasterBrightnessMode = 0;
         composeUniform.BlendCnt = region.BlendCnt;
         composeUniform.StandardColorEffect = (region.BlendCnt >> 6) & 0x3;
         composeUniform.EVA = region.EVA;
@@ -2212,41 +2711,111 @@ void DekoRenderer::ComposeBGOBJ()
         composeUniform.EVY = region.EVY;
         composeUniform.RenderScale = _3DRenderScale;
         composeUniform.FinalScale = _3DRenderScale;
-        EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
-            0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
-            &composeUniform);
+        composeUniform.DirectBitmapFullWhite = directBitmapFullWhite ? 1 : 0;
 
-        EmuCmdBuf.bindRenderTargets({&colorTarget});
-        EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
-
-        if (capture)
+        u32 regionEndLine = firstLine + region.LinesCount;
+        for (u32 chunkFirstLine = firstLine; chunkFirstLine < regionEndLine;)
         {
-            DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
-            EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
-            DkScissor nativeScissor = {0, firstLine, NativeWidth, region.LinesCount};
-            EmuCmdBuf.setScissors(0, {nativeScissor, nativeScissor});
+            u32 chunkHiResBGMask = getLineHiResBGMask(chunkFirstLine);
+            bool chunkHiResOBJ = getLineHiResOBJ(chunkFirstLine);
+            u32 chunkLines = 1;
+            while (chunkFirstLine + chunkLines < regionEndLine
+                && getLineHiResBGMask(chunkFirstLine + chunkLines) == chunkHiResBGMask
+                && getLineHiResOBJ(chunkFirstLine + chunkLines) == chunkHiResOBJ)
+            {
+                chunkLines++;
+            }
+
+            int textureHandleIdx[4];
+            for (int i = 0; i < 4; i++)
+            {
+                if (!(region.DispCnt & (1<<(bgOrder[i]+8))))
+                {
+                    textureHandleIdx[i] = descriptorOffset_DisabledBG;
+                }
+                else if (bgOrder[i] == 0 && CurUnit->Num == 0 && region.DispCnt & (1<<3))
+                {
+                    textureHandleIdx[i] = (chunkHiResBGMask & (1U << i))
+                        ? descriptorOffset_3DFramebufferHiRes
+                        : descriptorOffset_3DFramebuffer;
+                }
+                else if (chunkHiResBGMask & (1U << i))
+                {
+                    textureHandleIdx[i] = descriptorOffset_IntermedFbHiRes +
+                        fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
+                }
+                else
+                {
+                    textureHandleIdx[i] = descriptorOffset_IntermedFb +
+                        fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
+                }
+            }
+
+            int objTextureHandleIdx = chunkHiResOBJ
+                ? (descriptorOffset_IntermedFbHiRes + fb_OBJ + fb_Count * CurUnit->Num)
+                : nativeObjTextureHandleIdx;
+
+            EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, shader});
+            EmuCmdBuf.setViewports(0, {finalViewport, finalViewport});
+            DkScissor scissor = {
+                0, chunkFirstLine * (u32)_3DRenderScale,
+                outputWidth, chunkLines * (u32)_3DRenderScale
+            };
+            EmuCmdBuf.setScissors(0, {scissor, scissor});
 
             EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
             {
-                dkMakeTextureHandle(captureTextureHandleIdx[0], 0),
-                dkMakeTextureHandle(captureTextureHandleIdx[1], 0),
-                dkMakeTextureHandle(captureTextureHandleIdx[2], 0),
-                dkMakeTextureHandle(captureTextureHandleIdx[3], 0),
-                dkMakeTextureHandle(nativeObjTextureHandleIdx, 0),
+                dkMakeTextureHandle(textureHandleIdx[0], 0),
+                dkMakeTextureHandle(textureHandleIdx[1], 0),
+                dkMakeTextureHandle(textureHandleIdx[2], 0),
+                dkMakeTextureHandle(textureHandleIdx[3], 0),
+                dkMakeTextureHandle(objTextureHandleIdx, 0),
             });
 
-            composeUniform.RenderScale = 1;
-            composeUniform.FinalScale = 1;
-            composeUniform.HiResBGMask = 0;
-            composeUniform.HiResOBJ = 0;
+            composeUniform.RenderScale = _3DRenderScale;
+            composeUniform.FinalScale = _3DRenderScale;
+            composeUniform.HiResBGMask = chunkHiResBGMask;
+            composeUniform.HiResOBJ = chunkHiResOBJ ? 1 : 0;
+            composeUniform.DirectBitmapFullWhite = directBitmapFullWhite ? 1 : 0;
             EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
                 0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
                 &composeUniform);
 
-            dk::ImageView captureColorTarget{DisplayCaptureColorTarget};
-            dk::ImageView bgobj{BGOBJTexture};
-            EmuCmdBuf.bindRenderTargets({&captureColorTarget, &bgobj});
+            EmuCmdBuf.bindRenderTargets({&colorTarget});
             EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
+
+            if (capture)
+            {
+                EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, captureShader});
+                EmuCmdBuf.setViewports(0, {captureViewport, captureViewport});
+                DkScissor nativeScissor = {0, chunkFirstLine, NativeWidth, chunkLines};
+                EmuCmdBuf.setScissors(0, {nativeScissor, nativeScissor});
+
+                EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
+                {
+                    dkMakeTextureHandle(captureTextureHandleIdx[0], 0),
+                    dkMakeTextureHandle(captureTextureHandleIdx[1], 0),
+                    dkMakeTextureHandle(captureTextureHandleIdx[2], 0),
+                    dkMakeTextureHandle(captureTextureHandleIdx[3], 0),
+                    dkMakeTextureHandle(nativeObjTextureHandleIdx, 0),
+                });
+
+                composeUniform.RenderScale = 1;
+                composeUniform.FinalScale = 1;
+                composeUniform.HiResBGMask = 0;
+                composeUniform.HiResOBJ = 0;
+                composeUniform.DirectBitmapFullWhite = ((region.DispCnt & (1<<7)) || region.ForceBlank) ? 1 : 0;
+                EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
+                    0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
+                    &composeUniform);
+
+                dk::ImageView captureColorTarget{DisplayCaptureColorTarget};
+                dk::ImageView bgobj{BGOBJTexture};
+                EmuCmdBuf.bindRenderTargets({&captureColorTarget, &bgobj});
+                EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
+            }
+
+            chunkFirstLine += chunkLines;
         }
 
         firstLine += region.LinesCount;
@@ -2292,7 +2861,6 @@ void DekoRenderer::ComposeBGOBJ()
     }
 
     BGOBJRedrawn[CurUnit->Num] = 0;
-    OBJHiResFallback[CurUnit->Num] = false;
 
     if (CurUnit->Num == 0 && CaptureLatch)
     {

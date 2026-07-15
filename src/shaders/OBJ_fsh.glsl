@@ -2,6 +2,7 @@
 
 layout (binding = 0) uniform usamplerBuffer OBJVRAM8;
 layout (binding = 1) uniform usamplerBuffer OBJVRAM16;
+layout (binding = 2) uniform usampler2D MosaicTable;
 
 #cmakedefine OBJ4bpp
 #cmakedefine OBJ8bpp
@@ -9,10 +10,13 @@ layout (binding = 1) uniform usamplerBuffer OBJVRAM16;
 #cmakedefine OBJWindow
 
 layout (location = 0) in vec2 InInSpritePosition;
-layout (location = 1) flat in uvec3 InAddrInfo;
+layout (location = 1) flat in uvec4 InAddrInfo;
 layout (location = 2) flat in uvec2 InSize;
 
 layout (location = 0) out uint FinalColor;
+#ifdef OBJIndexOutput
+layout (location = 1) out uint OBJMosaicIndex;
+#endif
 
 layout (std140, binding = 0) uniform OBJUniform
 {
@@ -20,9 +24,55 @@ layout (std140, binding = 0) uniform OBJUniform
     vec4 AffineTransforms[32];
 };
 
+const uint OBJMosaicCoordMask = 0x1FFU;
+const uint OBJMosaicYShift = 0U;
+const uint OBJMosaicSizeYShift = 9U;
+const uint OBJMosaicVFlip = 1U << 13U;
+const uint OBJMosaicYEnable = 1U << 14U;
+const uint OBJMosaicAffineY = 1U << 15U;
+const uint OBJMosaicSpriteIDShift = 16U;
+const uint OBJMosaicPostXEnable = 1U << 24U;
+const uint OBJMosaicAffineParamShift = 25U;
+
+int DecodeMosaicCoord(uint value)
+{
+    int coord = int(value & OBJMosaicCoordMask);
+    if (coord >= 0x100)
+        coord -= 0x200;
+    return coord;
+}
+
+ivec2 FloorToIvec2(vec2 value)
+{
+    return ivec2(floor(value));
+}
+
 void main()
 {
-    ivec2 inSpritePosition = ivec2(InInSpritePosition);
+    vec2 spritePosition = InInSpritePosition;
+    if ((InAddrInfo.w & OBJMosaicYEnable) != 0U)
+    {
+        uint mosaicLevelY = (InAddrInfo.w >> OBJMosaicSizeYShift) & 0xFU;
+        int screenY = int(gl_FragCoord.y);
+        int mosaicY = int(texelFetch(MosaicTable, ivec2(screenY, int(mosaicLevelY)), 0).x);
+
+        if ((InAddrInfo.w & OBJMosaicAffineY) != 0U)
+        {
+            uint affineParam = (InAddrInfo.w >> OBJMosaicAffineParamShift) & 0x1FU;
+            int deltaY = screenY - mosaicY;
+            spritePosition -= AffineTransforms[affineParam].yw * float(deltaY) * 256.0;
+        }
+        else
+        {
+            int spriteY = DecodeMosaicCoord(InAddrInfo.w >> OBJMosaicYShift);
+            int sourceY = mosaicY - spriteY;
+            if ((InAddrInfo.w & OBJMosaicVFlip) != 0U)
+                sourceY = int(InSize.y >> 8) - 1 - sourceY;
+
+            spritePosition.y = float(sourceY * 256);
+        }
+    }
+    ivec2 inSpritePosition = FloorToIvec2(spritePosition);
 
     if (uint(inSpritePosition.x) >= InSize.x
         || uint(inSpritePosition.y) >= InSize.y)
@@ -31,6 +81,10 @@ void main()
     int basepixeladdr = int(InAddrInfo.x);
     int yshift = int(InAddrInfo.y);
     uint meta = InAddrInfo.z;
+#ifdef OBJIndexOutput
+    uint spriteID = (InAddrInfo.w >> OBJMosaicSpriteIDShift) & 0xFFU;
+    OBJMosaicIndex = spriteID | (((InAddrInfo.w & OBJMosaicPostXEnable) != 0U) ? 0x100U : 0U);
+#endif
 
     ivec2 position = inSpritePosition >> 11;
     ivec2 tile = (inSpritePosition >> 8) & ivec2(7);

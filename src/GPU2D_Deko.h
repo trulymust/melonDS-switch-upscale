@@ -63,11 +63,13 @@ public:
             {
                 BGHiResValid[unit] = 0;
                 OBJHiResValid[unit] = false;
-                OBJHiResFallback[unit] = false;
                 OBJBatchFirstLine[unit] = 0;
                 OBJBatchLinesCount[unit] = 0;
+                ClearOBJHiResLines(unit);
+                OBJCompositionDirty[unit] = true;
                 for (int bg = 0; bg < 4; bg++)
                 {
+                    ClearBGHiResLines(unit, bg);
                     BGBatchFirstLine[unit][bg] = 0;
                     BGBatchLinesCount[unit][bg] = 0;
                 }
@@ -83,10 +85,14 @@ private:
     static const u32 MaxRenderScale = 4;
     static const u32 FinalFramebufferWidth = NativeWidth * MaxRenderScale;
     static const u32 FinalFramebufferHeight = NativeHeight * MaxRenderScale;
+    static const u32 HiResLineValidWords = (NativeHeight + 63) / 64;
 
     int _3DRenderScale = 1;
 
-    u16 DispFIFOFramebuffer[256*192];
+    u16 DisplayCaptureSourceB[256*192];
+    u32 DisplayCaptureLine[192];
+    u32 DisplayCaptureSourceBAddr[192];
+    u8 DisplayCaptureSourceBVRAMBank[192];
 
     dk::Image FinalFramebuffers[2][2];
     GpuMemHeap::Allocation FinalFramebufferMemory;
@@ -118,12 +124,19 @@ private:
     dk::Image IntermedFramebuffersHiRes[fb_Count*2];
     GpuMemHeap::Allocation IntermedFramebufferHiResMemory;
     u32 BGHiResValid[2] = {};
+    u8 BGHiResScale[2][4] = {};
+    u64 BGHiResLineValid[2][4][HiResLineValidWords] = {};
     bool OBJHiResValid[2] = {};
-    bool OBJHiResFallback[2] = {};
+    u8 OBJHiResScale[2] = {};
+    u64 OBJHiResLineValid[2][HiResLineValidWords] = {};
     dk::Image OBJDepth;
     GpuMemHeap::Allocation OBJDepthMemory;
     dk::Image OBJDepthHiRes;
     GpuMemHeap::Allocation OBJDepthHiResMemory;
+    dk::Image OBJMosaicScratch[2];
+    GpuMemHeap::Allocation OBJMosaicScratchMemory;
+    dk::Image OBJMosaicIndex[2];
+    GpuMemHeap::Allocation OBJMosaicIndexMemory;
     dk::Image OBJWindow[2];
     GpuMemHeap::Allocation OBJWindowMemory;
 
@@ -154,7 +167,9 @@ private:
         descriptorOffset_3DFramebufferHiRes,
         descriptorOffset_DisabledBG,
         descriptorOffset_MosaicTable,
-        descriptorOffset_OBJWindow,
+        descriptorOffset_OBJMosaicScratch,
+        descriptorOffset_OBJMosaicIndex = descriptorOffset_OBJMosaicScratch+2,
+        descriptorOffset_OBJWindow = descriptorOffset_OBJMosaicIndex+2,
         descriptorOffset_Count = descriptorOffset_OBJWindow+2
     };
     GpuMemHeap::Allocation ImageDescriptors;
@@ -195,8 +210,12 @@ private:
     dk::Shader ShaderOBJ4bpp;
     dk::Shader ShaderOBJ8bpp;
     dk::Shader ShaderOBJBitmap;
+    dk::Shader ShaderOBJ4bppIndexed;
+    dk::Shader ShaderOBJ8bppIndexed;
+    dk::Shader ShaderOBJBitmapIndexed;
     dk::Shader ShaderOBJWindow4bpp;
     dk::Shader ShaderOBJWindow8bpp;
+    dk::Shader ShaderOBJMosaicX;
 
     CmdMemRing<8> CmdMem;
 
@@ -229,6 +248,7 @@ private:
         u32 EVA, EVB, EVY;
         u32 BGNumMask[4];
         u32 RenderScale, FinalScale, HiResBGMask, HiResOBJ;
+        u32 DirectBitmapFullWhite, __pad0, __pad1, __pad2;
         u32 Window[192*4];
     };
     const u32 ComposeUniformSize = (sizeof(ComposeUniform) + DK_UNIFORM_BUF_ALIGNMENT - 1) & ~(DK_UNIFORM_BUF_ALIGNMENT - 1);
@@ -287,8 +307,14 @@ private:
 
     void FlushBGDraw(u32 curline, u32 bgmask);
     void FlushOBJDraw(u32 curline);
-    void FillinCurComposeRegion(ComposeRegion& out);
+    void FillinCurComposeRegion(ComposeRegion& out, bool forceblank);
     void ComposeBGOBJ();
+    void ClearBGHiResLines(u32 unit, u32 bg);
+    void SetBGHiResLines(u32 unit, u32 bg, u32 firstLine, u32 linesCount, bool valid);
+    bool BGHiResLinesValid(u32 unit, u32 bg, u32 firstLine, u32 linesCount) const;
+    void ClearOBJHiResLines(u32 unit);
+    void SetOBJHiResLines(u32 unit, u32 firstLine, u32 linesCount, bool valid);
+    bool OBJHiResLinesValid(u32 unit, u32 firstLine, u32 linesCount) const;
 
 
     bool CmdBufOpen = false;
@@ -298,9 +324,11 @@ private:
     u8 BGOBJRedrawn[2] = {0};
 
     bool OBJWindowEmpty[2] = {true, true};
+    bool OBJWindowNeedsClear[2] = {true, true};
+    bool OBJCompositionDirty[2] = {};
 
     bool CaptureLatch = false;
-    u32 CaptureCnt = 0, DispCnt = 0;
+    u32 CaptureCnt = 0;
 
     s32 OBJBatchFirstLine[2], OBJBatchLinesCount[2];
     s32 BGBatchFirstLine[2][4], BGBatchLinesCount[2][4];
@@ -317,6 +345,7 @@ private:
     u32 LastOBJDispCnt[2];
     u16 LastBGCnt[2][4];
     u8 LastBGMosaicSizeX[2];
+    u8 LastBGMosaicSizeY[2];
     u8 LastBGMosaicYMax[2];
     u8 LastOBJMosaicSizeX[2];
     u8 LastOBJMosaicSizeY[2];
@@ -335,16 +364,16 @@ private:
 
     u8 OAMShadow[2*1024];
 
-    template<u32 bgmode> void DrawScanlineBGMode(u32 line);
-    void DrawScanlineBGMode6(u32 line);
-    void DrawScanlineBGMode7(u32 line);
-    void DrawScanline_BGOBJ(u32 line);
+    template<u32 bgmode> void DrawScanlineBGMode(u32 line, u32 outputLine);
+    void DrawScanlineBGMode6(u32 line, u32 outputLine);
+    void DrawScanlineBGMode7(u32 line, u32 outputLine);
+    void DrawScanline_BGOBJ(u32 line, u32 outputLine);
 
-    void DrawBG_3D(u32 line);
-    void DrawBG_Text(u32 line, u32 bgnum);
-    void DrawBG_Affine(u32 line, u32 bgnum);
-    void DrawBG_Extended(u32 line, u32 bgnum);
-    void DrawBG_Large(u32 line);
+    void DrawBG_3D(u32 outputLine);
+    void DrawBG_Text(u32 line, u32 outputLine, u32 bgnum);
+    void DrawBG_Affine(u32 outputLine, u32 bgnum);
+    void DrawBG_Extended(u32 outputLine, u32 bgnum);
+    void DrawBG_Large(u32 outputLine);
 };
 
 }

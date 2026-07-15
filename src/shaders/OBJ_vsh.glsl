@@ -4,11 +4,11 @@
 #cmakedefine OBJAffine
 
 layout (location = 0) in ivec4 InBounds;
-layout (location = 1) in uvec3 InAddrInfo;
+layout (location = 1) in uvec4 InAddrInfo;
 layout (location = 2) in float InDepth;
 
 layout (location = 0) out vec2 OutInSpritePosition;
-layout (location = 1) out uvec3 OutAddrInfo;
+layout (location = 1) out uvec4 OutAddrInfo;
 layout (location = 2) out uvec2 OutSize;
 
 

@@ -20,6 +20,18 @@ layout (std140, binding = 0) uniform BGUniform
     ivec4 PerLineData[192]; // rotX, rotY, rotA, rotC
 };
 
+int DivFloor(int value, int divisor)
+{
+    int quotient = value / divisor;
+    int remainder = value - quotient * divisor;
+    return quotient - (remainder < 0 ? 1 : 0);
+}
+
+ivec2 DivFloor(ivec2 value, int divisor)
+{
+    return ivec2(DivFloor(value.x, divisor), DivFloor(value.y, divisor));
+}
+
 void main()
 {
     ivec2 position = ivec2(gl_FragCoord.xy);
@@ -54,17 +66,17 @@ void main()
     {
         ivec2 nextLineBase = PerLineData[nativePosition.y + 1].xy;
         if (RenderScale == 2U)
-            lineBase += ((nextLineBase - lineBase) * subY) / 2;
+            lineBase += DivFloor((nextLineBase - lineBase) * subY, 2);
         else if (RenderScale == 4U)
-            lineBase += ((nextLineBase - lineBase) * subY) / 4;
+            lineBase += DivFloor((nextLineBase - lineBase) * subY, 4);
     }
 #endif
 
     ivec2 xStep = position.x * perLineData.zw;
     if (RenderScale == 2U)
-        xStep /= 2;
+        xStep = DivFloor(xStep, 2);
     else if (RenderScale == 4U)
-        xStep /= 4;
+        xStep = DivFloor(xStep, 4);
 
     ivec2 rot = lineBase + xStep;
 
