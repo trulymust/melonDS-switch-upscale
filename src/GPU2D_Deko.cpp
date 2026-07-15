@@ -1831,7 +1831,10 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
     drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1);
     OBJHiResFallback[CurUnit->Num] |= objMosaicFallback;
-    if (_3DRenderScale > 1 && !OBJHiResFallback[CurUnit->Num])
+    bool redrawsFullOBJLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
+    bool canUseHiResOBJ = _3DRenderScale > 1 && !OBJHiResFallback[CurUnit->Num]
+        && (OBJHiResValid[CurUnit->Num] || redrawsFullOBJLayer);
+    if (canUseHiResOBJ)
     {
         drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale);
         OBJHiResValid[CurUnit->Num] = true;
