@@ -303,6 +303,7 @@ void DekoRenderer::Reset()
     for (int i = 0; i < 2; i++)
     {
         LastDispCnt[i] = 0;
+        LastOBJDispCnt[i] = 0;
 
         OBJBatchFirstLine[i] = 0;
         OBJBatchLinesCount[i] = 0;
@@ -692,7 +693,9 @@ void DekoRenderer::DrawSprites(u32 line, Unit* unit)
         GPU::OAMDirty &= ~(1 << num);
     }
 
-    bool objFmtChanged = (LastDispCnt[CurUnit->Num] ^ CurUnit->DispCnt) & 0x70;
+    // OBJ address and palette mode bits affect the generated sprite layer.
+    const u32 objDispCntMask = 0x80700070;
+    bool objFmtChanged = (LastOBJDispCnt[num] ^ CurUnit->DispCnt) & objDispCntMask;
     bool objMosaicChanged = LastOBJMosaicSizeX[num] != CurUnit->OBJMosaicSize[0]
         || LastOBJMosaicSizeY[num] != CurUnit->OBJMosaicSize[1];
 
@@ -733,6 +736,7 @@ void DekoRenderer::DrawSprites(u32 line, Unit* unit)
     }
     LastOBJMosaicSizeX[num] = CurUnit->OBJMosaicSize[0];
     LastOBJMosaicSizeY[num] = CurUnit->OBJMosaicSize[1];
+    LastOBJDispCnt[num] = CurUnit->DispCnt;
 
     OBJBatchLinesCount[num]++;
 
@@ -1512,6 +1516,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         return;
 
     u16* oam = (u16*)&OAMShadow[CurUnit->Num ? 0x400 : 0];
+    u32 objDispCnt = LastOBJDispCnt[CurUnit->Num];
 
     enum
     {
@@ -1603,9 +1608,9 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
         if (spritemode == 3)
         {
-            if (LastDispCnt[CurUnit->Num] & 0x40)
+            if (objDispCnt & 0x40)
             {
-                if (LastDispCnt[CurUnit->Num] & 0x20)
+                if (objDispCnt & 0x20)
                 {
                     // 'reserved'
                     // draws nothing
@@ -1614,13 +1619,13 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
                 }
                 else
                 {
-                    addr = tilenum << (7 + ((LastDispCnt[CurUnit->Num] >> 22) & 0x1));
+                    addr = tilenum << (7 + ((objDispCnt >> 22) & 0x1));
                     strideShift |= __builtin_ctz(width) + 1;
                 }
             }
             else
             {
-                if (LastDispCnt[CurUnit->Num] & 0x20)
+                if (objDispCnt & 0x20)
                 {
                     addr = ((tilenum & 0x01F) << 4) + ((tilenum & 0x3E0) << 7);
                     strideShift |= 9;
@@ -1664,9 +1669,9 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             }
 
             addr = tilenum;
-            if (CurUnit->DispCnt & 0x10)
+            if (objDispCnt & 0x10)
             {
-                addr <<= ((CurUnit->DispCnt >> 20) & 0x3);
+                addr <<= ((objDispCnt >> 20) & 0x3);
                 strideShift |= __builtin_ctz(width) - 3 + ((attrib[0] & 0x2000) ? 1:0);
             }
             else
@@ -1679,7 +1684,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
             if (attrib[0] & 0x2000)
             {
-                if (CurUnit->DispCnt & 0x80000000)
+                if (objDispCnt & 0x80000000)
                     meta |= (((attrib[2] & 0xF000) >> 12) + paletteMemory_OBJExtPalOffset/512) << 8;
                 else
                     meta |= 0x100;

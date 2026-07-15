@@ -314,6 +314,7 @@ private:
     s16 LastBGRotC[2][2];
     s16 LastBGRotD[2][2];
     u32 LastDispCnt[2];
+    u32 LastOBJDispCnt[2];
     u16 LastBGCnt[2][4];
     u8 LastBGMosaicSizeX[2];
     u8 LastBGMosaicYMax[2];
