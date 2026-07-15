@@ -324,6 +324,7 @@ private:
     u8 BGOBJRedrawn[2] = {0};
 
     bool OBJWindowEmpty[2] = {true, true};
+    bool OBJWindowNeedsClear[2] = {true, true};
     bool OBJCompositionDirty[2] = {};
 
     bool CaptureLatch = false;

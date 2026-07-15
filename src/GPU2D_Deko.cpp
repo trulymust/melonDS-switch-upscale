@@ -345,6 +345,8 @@ void DekoRenderer::Reset()
         ClearOBJHiResLines(i);
         OBJCompositionDirty[i] = false;
         OBJWindowEmpty[i] = true;
+        // Force the next OBJ pass to clear the GPU texture before compose samples it.
+        OBJWindowNeedsClear[i] = true;
         ComposeRegions[i].clear();
 
         for (int j = 0; j < 4; j++)
@@ -1881,14 +1883,20 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         SetOBJHiResLines(unit, (u32)firstLine, (u32)linesCount, false);
         BGOBJRedrawn[unit] |= (1 << 4);
 
-        if (!OBJWindowEmpty[unit])
+        if (OBJWindowNeedsClear[unit] || !OBJWindowEmpty[unit])
         {
+            DkScissor objWindowScissor = OBJWindowNeedsClear[unit]
+                ? DkScissor{0, 0, NativeWidth, NativeHeight}
+                : DkScissor{0, (u32)firstLine, NativeWidth, (u32)linesCount};
+            EmuCmdBuf.setScissors(0, {objWindowScissor});
+
             dk::ImageView objWindow{OBJWindow[unit]};
             EmuCmdBuf.bindRenderTargets({&objWindow});
             EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
             BGOBJRedrawn[unit] |= (1 << 5);
-            if (firstLine == 0 && linesCount == (s32)NativeHeight)
+            if (OBJWindowNeedsClear[unit] || (firstLine == 0 && linesCount == (s32)NativeHeight))
                 OBJWindowEmpty[unit] = true;
+            OBJWindowNeedsClear[unit] = false;
         }
 
         EmuCmdBuf.barrier(DkBarrier_Fragments, DkInvalidateFlags_Image);
@@ -2313,19 +2321,26 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
     DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
     EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
-    EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine, NativeWidth, (u32)linesCount}});
+    DkScissor objWindowBatchScissor = {0, (u32)firstLine, NativeWidth, (u32)linesCount};
+    EmuCmdBuf.setScissors(0, {objWindowBatchScissor});
 
-    if (numWindowSpritesTotal > 0 || !OBJWindowEmpty[CurUnit->Num])
+    if (numWindowSpritesTotal > 0 || OBJWindowNeedsClear[CurUnit->Num] || !OBJWindowEmpty[CurUnit->Num])
     {
+        bool clearFullOBJWindow = OBJWindowNeedsClear[CurUnit->Num];
         dk::ImageView colorTarget{OBJWindow[CurUnit->Num]};
         EmuCmdBuf.bindRenderTargets({&colorTarget});
+        if (clearFullOBJWindow)
+            EmuCmdBuf.setScissors(0, {DkScissor{0, 0, NativeWidth, NativeHeight}});
         EmuCmdBuf.clearColor(0, DkColorMask_R, 0);
+        if (clearFullOBJWindow)
+            EmuCmdBuf.setScissors(0, {objWindowBatchScissor});
 
         BGOBJRedrawn[CurUnit->Num] |= (1 << 5);
-        OBJWindowEmpty[CurUnit->Num] = false;
+        OBJWindowNeedsClear[CurUnit->Num] = false;
 
         if (numWindowSpritesTotal > 0)
         {
+            OBJWindowEmpty[CurUnit->Num] = false;
             bindOBJDrawState();
 
             EmuCmdBuf.bindColorState(dk::ColorState{}
@@ -2347,7 +2362,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
             EmuCmdBuf.bindColorState(dk::ColorState{});
         }
-        else if (firstLine == 0 && linesCount == (s32)NativeHeight)
+        else if (clearFullOBJWindow || (firstLine == 0 && linesCount == (s32)NativeHeight))
         {
             OBJWindowEmpty[CurUnit->Num] = true;
         }
