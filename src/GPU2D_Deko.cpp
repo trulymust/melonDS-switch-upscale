@@ -785,8 +785,27 @@ void DekoRenderer::DoCapture()
     srcBaddr &= 0xFFFF;
 
     static_assert(GPU::VRAMDirtyGranularity == 512, "");
-    for (u32 i = 0; i < height; i++)
-        GPU::VRAMDirty[dstvram][(((dstaddr + i*256) * 2) & 0x1FFFF) / GPU::VRAMDirtyGranularity] = true;
+    auto markCaptureDirty = [&](u32 dstpos, u32 pixels)
+    {
+        u32 byteAddr = (dstpos * 2) & 0x1FFFF;
+        u32 bytesLeft = pixels * 2;
+        while (bytesLeft > 0)
+        {
+            u32 chunk = bytesLeft;
+            u32 bankBytesLeft = 0x20000 - byteAddr;
+            if (chunk > bankBytesLeft)
+                chunk = bankBytesLeft;
+
+            u32 firstBlock = byteAddr / GPU::VRAMDirtyGranularity;
+            u32 lastBlock = (byteAddr + chunk - 1) / GPU::VRAMDirtyGranularity;
+            for (u32 block = firstBlock; block <= lastBlock; block++)
+                GPU::VRAMDirty[dstvram][block] = true;
+
+            bytesLeft -= chunk;
+            byteAddr = 0;
+        }
+    };
+    markCaptureDirty(dstaddr, width*height);
 
     u32 eva = CaptureCnt & 0x1F;
     u32 evb = (CaptureCnt >> 8) & 0x1F;
