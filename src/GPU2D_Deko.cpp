@@ -513,6 +513,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
 
         if (compositionDirty)
         {
+            composeRegion.ForceBlank = forceblank;
             composeRegion.DispCnt = CurUnit->DispCnt;
             for (int i = 0; i < 4; i++)
                 composeRegion.BGCnt[i] = CurUnit->BGCnt[i];
@@ -1811,7 +1812,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
             EmuCmdBuf.bindColorState(dk::ColorState{});
         }
-        else if (firstLine == 0 && linesCount == 256)
+        else if (firstLine == 0 && linesCount == (s32)NativeHeight)
         {
             OBJWindowEmpty[CurUnit->Num] = true;
         }
@@ -2021,7 +2022,7 @@ void DekoRenderer::ComposeBGOBJ()
 
         u32 dispmode = region.DispCnt >> 16;
         dispmode &= (CurUnit->Num ? 0x1 : 0x3);
-        bool showDirectBitmap = dispmode != 1 || (CurUnit->DispCnt & (1<<7)) || region.ForceBlank;
+        bool showDirectBitmap = dispmode != 1 || (region.DispCnt & (1<<7)) || region.ForceBlank;
 
         if (capture)
         {
