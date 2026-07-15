@@ -2419,14 +2419,14 @@ void DekoRenderer::ComposeBGOBJ()
         {
             shader = showDirectBitmap ? &ShaderComposeBGOBJDirectBitmapOnly : &ShaderComposeBGOBJ;
         }
-        EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, shader});
+        dk::Shader* captureShader = ((region.DispCnt & (1<<7)) || region.ForceBlank)
+            ? &ShaderComposeBGOBJShowBitmap
+            : &ShaderComposeBGOBJ;
 
         u32 outputWidth = NativeWidth * _3DRenderScale;
         u32 outputHeight = NativeHeight * _3DRenderScale;
         DkViewport finalViewport = {0.f, 0.f, (float)outputWidth, (float)outputHeight, 0.f, 1.f};
-        EmuCmdBuf.setViewports(0, {finalViewport, finalViewport});
-        DkScissor scissor = {0, firstLine * (u32)_3DRenderScale, outputWidth, region.LinesCount * (u32)_3DRenderScale};
-        EmuCmdBuf.setScissors(0, {scissor, scissor});
+        DkViewport captureViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
         //printf("compositing region %d %d\n", firstLine, region.LinesCount);
 
         u32 bgOrder[4];
@@ -2437,7 +2437,6 @@ void DekoRenderer::ComposeBGOBJ()
                     bgOrder[n++] = j;
 
         ComposeUniform& composeUniform = ComposeUniforms[CurUnit->Num];
-        int textureHandleIdx[4];
         int captureTextureHandleIdx[4];
         composeUniform.HiResBGMask = 0;
         composeUniform.HiResOBJ = 0;
@@ -2463,34 +2462,17 @@ void DekoRenderer::ComposeBGOBJ()
 
             if (!(region.DispCnt & (1<<(bgOrder[i]+8))))
             {
-                textureHandleIdx[i] = descriptorOffset_DisabledBG;
                 captureTextureHandleIdx[i] = descriptorOffset_DisabledBG;
             }
             else if (bgOrder[i] == 0 && CurUnit->Num == 0 && region.DispCnt & (1<<3))
             {
-                textureHandleIdx[i] = _3DRenderScale > 1
-                    ? descriptorOffset_3DFramebufferHiRes
-                    : descriptorOffset_3DFramebuffer;
                 captureTextureHandleIdx[i] = descriptorOffset_3DFramebuffer;
-                if (_3DRenderScale > 1)
-                    composeUniform.HiResBGMask |= 1U << i;
             }
             else
             {
                 int nativeTextureHandleIdx = descriptorOffset_IntermedFb +
                     fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
                 captureTextureHandleIdx[i] = nativeTextureHandleIdx;
-
-                if (_3DRenderScale > 1 && BGHiResLinesValid(CurUnit->Num, bgOrder[i], firstLine, region.LinesCount))
-                {
-                    textureHandleIdx[i] = descriptorOffset_IntermedFbHiRes +
-                        fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
-                    composeUniform.HiResBGMask |= 1U << i;
-                }
-                else
-                {
-                    textureHandleIdx[i] = nativeTextureHandleIdx;
-                }
             }
 
             composeUniform.BGNumMask[i] = 1 << bgOrder[i];
@@ -2499,23 +2481,38 @@ void DekoRenderer::ComposeBGOBJ()
         int nativeObjTextureHandleIdx = region.DispCnt & (1<<12)
             ? (descriptorOffset_IntermedFb + fb_OBJ + fb_Count * CurUnit->Num)
             : descriptorOffset_DisabledBG;
-        int objTextureHandleIdx = nativeObjTextureHandleIdx;
-        if (_3DRenderScale > 1 && (region.DispCnt & (1<<12))
-            && OBJHiResLinesValid(CurUnit->Num, firstLine, region.LinesCount))
-        {
-            objTextureHandleIdx = descriptorOffset_IntermedFbHiRes + fb_OBJ + fb_Count * CurUnit->Num;
-            composeUniform.HiResOBJ = 1;
-        }
 
         assert(n == 4);
-        EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
+
+        auto getLineHiResBGMask = [&](u32 line)
         {
-            dkMakeTextureHandle(textureHandleIdx[0], 0),
-            dkMakeTextureHandle(textureHandleIdx[1], 0),
-            dkMakeTextureHandle(textureHandleIdx[2], 0),
-            dkMakeTextureHandle(textureHandleIdx[3], 0),
-            dkMakeTextureHandle(objTextureHandleIdx, 0),
-        });
+            u32 mask = 0;
+            if (_3DRenderScale <= 1 || showDirectBitmap)
+                return mask;
+
+            for (int i = 0; i < 4; i++)
+            {
+                if (!(region.DispCnt & (1<<(bgOrder[i]+8))))
+                    continue;
+
+                if (bgOrder[i] == 0 && CurUnit->Num == 0 && region.DispCnt & (1<<3))
+                {
+                    mask |= 1U << i;
+                }
+                else if (BGHiResLinesValid(CurUnit->Num, bgOrder[i], line, 1))
+                {
+                    mask |= 1U << i;
+                }
+            }
+
+            return mask;
+        };
+
+        auto getLineHiResOBJ = [&](u32 line)
+        {
+            return _3DRenderScale > 1 && !showDirectBitmap && (region.DispCnt & (1<<12))
+                && OBJHiResLinesValid(CurUnit->Num, line, 1);
+        };
 
         composeUniform.MasterBrightnessFactor = region.MasterBrightness & 0x1F;
         composeUniform.MasterBrightnessMode = region.MasterBrightness >> 14;
@@ -2533,47 +2530,110 @@ void DekoRenderer::ComposeBGOBJ()
         composeUniform.RenderScale = _3DRenderScale;
         composeUniform.FinalScale = _3DRenderScale;
         composeUniform.DirectBitmapFullWhite = directBitmapFullWhite ? 1 : 0;
-        EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
-            0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
-            &composeUniform);
 
-        EmuCmdBuf.bindRenderTargets({&colorTarget});
-        EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
-
-        if (capture)
+        u32 regionEndLine = firstLine + region.LinesCount;
+        for (u32 chunkFirstLine = firstLine; chunkFirstLine < regionEndLine;)
         {
-            dk::Shader* captureShader = ((region.DispCnt & (1<<7)) || region.ForceBlank)
-                ? &ShaderComposeBGOBJShowBitmap
-                : &ShaderComposeBGOBJ;
-            EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, captureShader});
+            u32 chunkHiResBGMask = getLineHiResBGMask(chunkFirstLine);
+            bool chunkHiResOBJ = getLineHiResOBJ(chunkFirstLine);
+            u32 chunkLines = 1;
+            while (chunkFirstLine + chunkLines < regionEndLine
+                && getLineHiResBGMask(chunkFirstLine + chunkLines) == chunkHiResBGMask
+                && getLineHiResOBJ(chunkFirstLine + chunkLines) == chunkHiResOBJ)
+            {
+                chunkLines++;
+            }
 
-            DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
-            EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
-            DkScissor nativeScissor = {0, firstLine, NativeWidth, region.LinesCount};
-            EmuCmdBuf.setScissors(0, {nativeScissor, nativeScissor});
+            int textureHandleIdx[4];
+            for (int i = 0; i < 4; i++)
+            {
+                if (!(region.DispCnt & (1<<(bgOrder[i]+8))))
+                {
+                    textureHandleIdx[i] = descriptorOffset_DisabledBG;
+                }
+                else if (bgOrder[i] == 0 && CurUnit->Num == 0 && region.DispCnt & (1<<3))
+                {
+                    textureHandleIdx[i] = (chunkHiResBGMask & (1U << i))
+                        ? descriptorOffset_3DFramebufferHiRes
+                        : descriptorOffset_3DFramebuffer;
+                }
+                else if (chunkHiResBGMask & (1U << i))
+                {
+                    textureHandleIdx[i] = descriptorOffset_IntermedFbHiRes +
+                        fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
+                }
+                else
+                {
+                    textureHandleIdx[i] = descriptorOffset_IntermedFb +
+                        fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
+                }
+            }
+
+            int objTextureHandleIdx = chunkHiResOBJ
+                ? (descriptorOffset_IntermedFbHiRes + fb_OBJ + fb_Count * CurUnit->Num)
+                : nativeObjTextureHandleIdx;
+
+            EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, shader});
+            EmuCmdBuf.setViewports(0, {finalViewport, finalViewport});
+            DkScissor scissor = {
+                0, chunkFirstLine * (u32)_3DRenderScale,
+                outputWidth, chunkLines * (u32)_3DRenderScale
+            };
+            EmuCmdBuf.setScissors(0, {scissor, scissor});
 
             EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
             {
-                dkMakeTextureHandle(captureTextureHandleIdx[0], 0),
-                dkMakeTextureHandle(captureTextureHandleIdx[1], 0),
-                dkMakeTextureHandle(captureTextureHandleIdx[2], 0),
-                dkMakeTextureHandle(captureTextureHandleIdx[3], 0),
-                dkMakeTextureHandle(nativeObjTextureHandleIdx, 0),
+                dkMakeTextureHandle(textureHandleIdx[0], 0),
+                dkMakeTextureHandle(textureHandleIdx[1], 0),
+                dkMakeTextureHandle(textureHandleIdx[2], 0),
+                dkMakeTextureHandle(textureHandleIdx[3], 0),
+                dkMakeTextureHandle(objTextureHandleIdx, 0),
             });
 
-            composeUniform.RenderScale = 1;
-            composeUniform.FinalScale = 1;
-            composeUniform.HiResBGMask = 0;
-            composeUniform.HiResOBJ = 0;
-            composeUniform.DirectBitmapFullWhite = ((region.DispCnt & (1<<7)) || region.ForceBlank) ? 1 : 0;
+            composeUniform.RenderScale = _3DRenderScale;
+            composeUniform.FinalScale = _3DRenderScale;
+            composeUniform.HiResBGMask = chunkHiResBGMask;
+            composeUniform.HiResOBJ = chunkHiResOBJ ? 1 : 0;
+            composeUniform.DirectBitmapFullWhite = directBitmapFullWhite ? 1 : 0;
             EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
                 0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
                 &composeUniform);
 
-            dk::ImageView captureColorTarget{DisplayCaptureColorTarget};
-            dk::ImageView bgobj{BGOBJTexture};
-            EmuCmdBuf.bindRenderTargets({&captureColorTarget, &bgobj});
+            EmuCmdBuf.bindRenderTargets({&colorTarget});
             EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
+
+            if (capture)
+            {
+                EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, captureShader});
+                EmuCmdBuf.setViewports(0, {captureViewport, captureViewport});
+                DkScissor nativeScissor = {0, chunkFirstLine, NativeWidth, chunkLines};
+                EmuCmdBuf.setScissors(0, {nativeScissor, nativeScissor});
+
+                EmuCmdBuf.bindTextures(DkStage_Fragment, 0,
+                {
+                    dkMakeTextureHandle(captureTextureHandleIdx[0], 0),
+                    dkMakeTextureHandle(captureTextureHandleIdx[1], 0),
+                    dkMakeTextureHandle(captureTextureHandleIdx[2], 0),
+                    dkMakeTextureHandle(captureTextureHandleIdx[3], 0),
+                    dkMakeTextureHandle(nativeObjTextureHandleIdx, 0),
+                });
+
+                composeUniform.RenderScale = 1;
+                composeUniform.FinalScale = 1;
+                composeUniform.HiResBGMask = 0;
+                composeUniform.HiResOBJ = 0;
+                composeUniform.DirectBitmapFullWhite = ((region.DispCnt & (1<<7)) || region.ForceBlank) ? 1 : 0;
+                EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
+                    0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
+                    &composeUniform);
+
+                dk::ImageView captureColorTarget{DisplayCaptureColorTarget};
+                dk::ImageView bgobj{BGOBJTexture};
+                EmuCmdBuf.bindRenderTargets({&captureColorTarget, &bgobj});
+                EmuCmdBuf.draw(DkPrimitive_TriangleStrip, 4, 1, 0, 0);
+            }
+
+            chunkFirstLine += chunkLines;
         }
 
         firstLine += region.LinesCount;
