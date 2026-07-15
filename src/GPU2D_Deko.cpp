@@ -895,6 +895,35 @@ void DekoRenderer::DoCapture()
 
     //printf("capturing %d %dx%d to %d (eva %d | evb %d) %p %p\n", source, width, height, dstvram, eva, evb, srcA, srcB);
 
+    auto blendCapturePixel = [&](u32& dstpos, u32 line, u32 x)
+    {
+        u8* pixelA = &srcA[(x + line * NativeWidth) * 4];
+        bool alphaA = pixelA[3] != 0;
+        u16 pixelB = loadSourceBPixel(line, x);
+        bool alphaB = (pixelB & 0x8000) != 0;
+
+        u32 rA = alphaA ? (pixelA[0] >> 1) : 0;
+        u32 gA = alphaA ? (pixelA[1] >> 1) : 0;
+        u32 bA = alphaA ? (pixelA[2] >> 1) : 0;
+
+        u32 rB = alphaB ? (pixelB & 0x1F) : 0;
+        u32 gB = alphaB ? ((pixelB >> 5) & 0x1F) : 0;
+        u32 bB = alphaB ? ((pixelB >> 10) & 0x1F) : 0;
+
+        u32 r = ((rA * eva) + (rB * evb)) >> 4;
+        u32 g = ((gA * eva) + (gB * evb)) >> 4;
+        u32 b = ((bA * eva) + (bB * evb)) >> 4;
+        u32 alpha = ((eva != 0 && alphaA) || (evb != 0 && alphaB)) ? 0x8000 : 0;
+
+        if (r > 0x1F) r = 0x1F;
+        if (g > 0x1F) g = 0x1F;
+        if (b > 0x1F) b = 0x1F;
+
+        dst[dstpos] = r | (g << 5) | (b << 10) | alpha;
+        markCaptureWritten(dstpos, 1);
+        dstpos = (dstpos + 1) & 0xFFFF;
+    };
+
     switch (source)
     {
     case 0: // source A
@@ -970,21 +999,17 @@ void DekoRenderer::DoCapture()
                 for (u32 j = 0; j < height; j++)
                 {
                     bool sourceBMayOverlap = DisplayCaptureSourceBVRAMBank[j] == dstvram;
+                    if (sourceBMayOverlap)
+                    {
+                        for (u32 i = 0; i < width; i++)
+                            blendCapturePixel(dstaddr, j, i);
+                        continue;
+                    }
+
                     for (u32 i = 0; i < width; i += 16)
                     {
                         uint8x16x4_t pixelsA = vld4q_u8(&srcA[(i + j * 256) * 4]);
-                        u16 sourceBBlock[16];
-                        uint8x16x2_t pixelsB;
-                        if (sourceBMayOverlap)
-                        {
-                            for (u32 k = 0; k < 16; k++)
-                                sourceBBlock[k] = loadSourceBPixel(j, i + k);
-                            pixelsB = vld2q_u8((u8*)sourceBBlock);
-                        }
-                        else
-                        {
-                            pixelsB = vld2q_u8((u8*)&srcB[j*NativeWidth + i]);
-                        }
+                        uint8x16x2_t pixelsB = vld2q_u8((u8*)&srcB[j*NativeWidth + i]);
                         uint8x16_t alphaA = vtstq_u8(pixelsA.val[3], pixelsA.val[3]);
                         uint8x16_t alphaB = vtstq_u8(pixelsB.val[1], vdupq_n_u8(0x80));
 
