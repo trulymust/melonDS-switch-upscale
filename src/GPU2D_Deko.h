@@ -314,6 +314,8 @@ private:
     u16 LastBGCnt[2][4];
     u8 LastBGMosaicSizeX[2];
     u8 LastBGMosaicYMax[2];
+    u8 LastOBJMosaicSizeX[2];
+    u8 LastOBJMosaicSizeY[2];
 
     bool AffineChangedMidframe[2][2];
 

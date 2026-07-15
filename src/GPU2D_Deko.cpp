@@ -316,6 +316,8 @@ void DekoRenderer::Reset()
         DirectBitmapNeeded[i] = false;
         LastBGMosaicSizeX[i] = 0;
         LastBGMosaicYMax[i] = 0;
+        LastOBJMosaicSizeX[i] = 0;
+        LastOBJMosaicSizeY[i] = 0;
         BGOBJRedrawn[i] = 0;
         BGHiResValid[i] = 0;
         OBJHiResValid[i] = false;
@@ -689,13 +691,15 @@ void DekoRenderer::DrawSprites(u32 line, Unit* unit)
     }
 
     bool objFmtChanged = (LastDispCnt[CurUnit->Num] ^ CurUnit->DispCnt) & 0x70;
+    bool objMosaicChanged = LastOBJMosaicSizeX[num] != CurUnit->OBJMosaicSize[0]
+        || LastOBJMosaicSizeY[num] != CurUnit->OBJMosaicSize[1];
 
     bool uploadBarrier = false;
     if (num == 0)
     {
         auto objDirty = GPU::VRAMDirty_AOBJ.DeriveState(GPU::VRAMMap_AOBJ);
 
-        if (oamDirty || objDirty || objFmtChanged)
+        if (oamDirty || objDirty || objFmtChanged || objMosaicChanged)
             FlushOBJDraw(line);
 
         if (GPU::MakeVRAMFlat_AOBJCoherent(objDirty))
@@ -708,7 +712,7 @@ void DekoRenderer::DrawSprites(u32 line, Unit* unit)
     {
         auto objDirty = GPU::VRAMDirty_BOBJ.DeriveState(GPU::VRAMMap_BOBJ);
 
-        if (oamDirty || objDirty || objFmtChanged)
+        if (oamDirty || objDirty || objFmtChanged || objMosaicChanged)
             FlushOBJDraw(line);
 
         if (GPU::MakeVRAMFlat_BOBJCoherent(objDirty))
@@ -725,6 +729,8 @@ void DekoRenderer::DrawSprites(u32 line, Unit* unit)
     {
         memcpy(&OAMShadow[num ? 0x400 : 0], &GPU::OAM[num ? 0x400 : 0], 0x400);
     }
+    LastOBJMosaicSizeX[num] = CurUnit->OBJMosaicSize[0];
+    LastOBJMosaicSizeY[num] = CurUnit->OBJMosaicSize[1];
 
     OBJBatchLinesCount[num]++;
 
@@ -1531,6 +1537,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     SpriteSpec sprites[spriteKind_Count][128];
     int numSpritesTotal = 0;
     int numWindowSpritesTotal = 0;
+    bool objMosaicFallback = false;
 
     OBJUniform uniform;
     uniform.VRAMMask = CurUnit->Num ? 0x1FFFF : 0x3FFFF;
@@ -1714,6 +1721,10 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         if (sprite.X >= 256)
             continue;
 
+        if (spritemode != 2 && (attrib[0] & 0x1000)
+            && (CurUnit->OBJMosaicSize[0] > 0 || CurUnit->OBJMosaicSize[1] > 0))
+            objMosaicFallback = true;
+
         numSprites[spriteKind]++;
         numSpritesTotal++;
     }
@@ -1812,7 +1823,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     };
 
     drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1);
-    if (_3DRenderScale > 1)
+    if (_3DRenderScale > 1 && !objMosaicFallback)
     {
         drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale);
         OBJHiResValid[CurUnit->Num] = true;
