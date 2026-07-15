@@ -1938,8 +1938,14 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
 
                 clearBGAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_BG0 + i], 1);
                 if (_3DRenderScale > 1)
+                {
                     clearBGAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i], (u32)_3DRenderScale);
-                BGHiResValid[CurUnit->Num] &= ~(1U << i);
+                    BGHiResValid[CurUnit->Num] |= 1U << i;
+                }
+                else
+                {
+                    BGHiResValid[CurUnit->Num] &= ~(1U << i);
+                }
             }
 
             assert(BGBatchLinesCount[CurUnit->Num][i] > 0);
