@@ -469,7 +469,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
 
     bool forceblank = false;
 
-    if (line >= NativeHeight) forceblank = true;
+    if (line > NativeHeight) forceblank = true;
     if (CurUnit->Num && !CurUnit->Enabled) forceblank = true;
 
     OpenCmdBuf();
