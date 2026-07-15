@@ -1792,6 +1792,20 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         float Depth;
     };
 
+    constexpr u32 objMosaicCoordMask = 0x1FF;
+    constexpr u32 objMosaicXShift = 0;
+    constexpr u32 objMosaicYShift = 9;
+    constexpr u32 objMosaicSizeXShift = 18;
+    constexpr u32 objMosaicSizeYShift = 22;
+    constexpr u32 objMosaicHFlip = 1U << 26;
+    constexpr u32 objMosaicVFlip = 1U << 27;
+    constexpr u32 objMosaicEnable = 1U << 28;
+
+    auto packMosaicCoord = [](s32 coord)
+    {
+        return (u32)coord & objMosaicCoordMask;
+    };
+
     int numSprites[spriteKind_Count] = {};
     static const int MaxSpriteSpecsPerKind = 256;
     SpriteSpec sprites[spriteKind_Count][MaxSpriteSpecsPerKind];
@@ -2019,12 +2033,16 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
             sprite.StrideShift = strideShift;
             sprite.Meta = meta;
             sprite.Mosaic = 0;
-            if (spritemode != 2 && !isAffine && (attrib[0] & 0x1000) && objMosaicSizeY > 0)
+            if (spritemode != 2 && !isAffine && (attrib[0] & 0x1000)
+                && (objMosaicSizeX > 0 || objMosaicSizeY > 0))
             {
-                sprite.Mosaic = ((u32)(u16)y)
-                    | ((u32)objMosaicSizeY << 16)
-                    | (1U << 20)
-                    | ((attrib[1] & 0x2000) ? (1U << 21) : 0);
+                sprite.Mosaic = objMosaicEnable
+                    | (packMosaicCoord(spriteX) << objMosaicXShift)
+                    | (packMosaicCoord(y) << objMosaicYShift)
+                    | ((u32)objMosaicSizeX << objMosaicSizeXShift)
+                    | ((u32)objMosaicSizeY << objMosaicSizeYShift)
+                    | ((attrib[1] & 0x1000) ? objMosaicHFlip : 0)
+                    | ((attrib[1] & 0x2000) ? objMosaicVFlip : 0);
             }
             sprite.Depth = depthKey;
             //printf("%d %d %x %x %d %d %d %d %d\n", spriteKind, prio, sprite.BaseAddr, sprite.StrideShift, tilenum, sprite.X, sprite.Y, sprite.Width, sprite.Height);
