@@ -630,15 +630,7 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
 
         if (compositionDirty)
         {
-            composeRegion.ForceBlank = forceblank;
-            composeRegion.DispCnt = CurUnit->DispCnt;
-            for (int i = 0; i < 4; i++)
-                composeRegion.BGCnt[i] = CurUnit->BGCnt[i];
-            composeRegion.BlendCnt = CurUnit->BlendCnt;
-            composeRegion.MasterBrightness = CurUnit->MasterBrightness;
-            composeRegion.EVA = CurUnit->EVA;
-            composeRegion.EVB = CurUnit->EVB;
-            composeRegion.EVY = CurUnit->EVY;
+            FillinCurComposeRegion(composeRegion, forceblank);
             ComposeRegions[num].push_back(composeRegion);
             OBJCompositionDirty[num] = false;
         }
@@ -1257,6 +1249,19 @@ void DekoRenderer::DoCapture()
 void DekoRenderer::VBlankEnd(Unit* unitA, Unit* unitB)
 {
     
+}
+
+void DekoRenderer::FillinCurComposeRegion(ComposeRegion& out, bool forceblank)
+{
+    out.ForceBlank = forceblank;
+    out.DispCnt = CurUnit->DispCnt;
+    for (int i = 0; i < 4; i++)
+        out.BGCnt[i] = CurUnit->BGCnt[i];
+    out.BlendCnt = CurUnit->BlendCnt;
+    out.MasterBrightness = CurUnit->MasterBrightness;
+    out.EVA = CurUnit->EVA;
+    out.EVB = CurUnit->EVB;
+    out.EVY = CurUnit->EVY;
 }
 
 void DekoRenderer::DrawScanline_BGOBJ(u32 line, u32 outputLine)

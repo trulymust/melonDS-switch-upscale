@@ -294,7 +294,7 @@ private:
 
     void FlushBGDraw(u32 curline, u32 bgmask);
     void FlushOBJDraw(u32 curline);
-    void FillinCurComposeRegion(ComposeRegion& out);
+    void FillinCurComposeRegion(ComposeRegion& out, bool forceblank);
     void ComposeBGOBJ();
     void ClearBGHiResLines(u32 unit, u32 bg);
     void SetBGHiResLines(u32 unit, u32 bg, u32 firstLine, u32 linesCount, bool valid);
