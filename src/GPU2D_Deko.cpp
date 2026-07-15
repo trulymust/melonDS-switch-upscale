@@ -351,6 +351,7 @@ void DekoRenderer::Reset()
     CaptureLatch = false;
     CaptureCnt = 0;
     memset(DisplayCaptureSourceB, 0, sizeof(DisplayCaptureSourceB));
+    memset(DisplayCaptureLine, 0xFF, sizeof(DisplayCaptureLine));
     memset(DisplayCaptureSourceBAddr, 0, sizeof(DisplayCaptureSourceBAddr));
     memset(DisplayCaptureSourceBVRAMBank, 0xFF, sizeof(DisplayCaptureSourceBVRAMBank));
 
@@ -647,12 +648,18 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             CurUnit->CaptureLatch = true;
             CaptureLatch = true;
             CaptureCnt = CurUnit->CaptureCnt;
+            memset(DisplayCaptureLine, 0xFF, sizeof(DisplayCaptureLine));
+            memset(DisplayCaptureSourceBAddr, 0, sizeof(DisplayCaptureSourceBAddr));
+            memset(DisplayCaptureSourceBVRAMBank, 0xFF, sizeof(DisplayCaptureSourceBVRAMBank));
         }
         else
         {
             CaptureLatch = false;
         }
     }
+
+    if (CurUnit->Num == 0 && CaptureLatch)
+        DisplayCaptureLine[n3dline] = line;
 
     if (CurUnit->Num == 0 && CaptureLatch && ((CaptureCnt >> 29) & 0x3) != 0)
     {
@@ -917,14 +924,14 @@ void DekoRenderer::DoCapture()
         return;
 
     u16* dst = (u16*)GPU::VRAM[dstvram];
-    u32 dstaddr = (((CaptureCnt >> 18) & 0x3) << 14);
+    u32 captureBaseAddr = (((CaptureCnt >> 18) & 0x3) << 14);
 
     u8* srcA = Gfx::DataHeap->CpuAddr<u8>(DisplayCaptureMemory);
 
     u32 source = (CaptureCnt >> 29) & 0x3;
     u16* srcB = source != 0 ? DisplayCaptureSourceB : NULL;
 
-    dstaddr &= 0xFFFF;
+    captureBaseAddr &= 0xFFFF;
 
     static_assert(GPU::VRAMDirtyGranularity == 512, "");
     auto markCaptureDirty = [&](u32 dstpos, u32 pixels)
@@ -947,7 +954,17 @@ void DekoRenderer::DoCapture()
             byteAddr = 0;
         }
     };
-    markCaptureDirty(dstaddr, width*height);
+    markCaptureDirty(captureBaseAddr, width*height);
+
+    auto getCaptureDstAddr = [&](u32 outputLine, u32& dstaddr)
+    {
+        u32 captureLine = DisplayCaptureLine[outputLine];
+        if (captureLine >= height)
+            return false;
+
+        dstaddr = (captureBaseAddr + captureLine * width) & 0xFFFF;
+        return true;
+    };
 
     u64 captureWritten[0x10000 / 64] = {};
     auto isCaptureWritten = [&](u32 pos)
@@ -1036,8 +1053,12 @@ void DekoRenderer::DoCapture()
     {
     case 0: // source A
         {
-            for (u32 j = 0; j < height; j++)
+            for (u32 j = 0; j < NativeHeight; j++)
             {
+                u32 dstaddr;
+                if (!getCaptureDstAddr(j, dstaddr))
+                    continue;
+
                 for (u32 i = 0; i < width; i += 16)
                 {
                     uint8x16x4_t pixels = vld4q_u8(&srcA[(i + j * 256) * 4]);
@@ -1059,8 +1080,12 @@ void DekoRenderer::DoCapture()
 
     case 1: // source B
         {
-            for (u32 j = 0; j < height; j++)
+            for (u32 j = 0; j < NativeHeight; j++)
             {
+                u32 dstaddr;
+                if (!getCaptureDstAddr(j, dstaddr))
+                    continue;
+
                 for (u32 i = 0; i < width;)
                 {
                     u32 copyAmount = width - i;
@@ -1104,8 +1129,12 @@ void DekoRenderer::DoCapture()
             {
                 uint8x16_t evaMask = vdupq_n_u8(eva ? 0xFF : 0);
                 uint8x16_t evbMask = vdupq_n_u8(evb ? 0xFF : 0);
-                for (u32 j = 0; j < height; j++)
+                for (u32 j = 0; j < NativeHeight; j++)
                 {
+                    u32 dstaddr;
+                    if (!getCaptureDstAddr(j, dstaddr))
+                        continue;
+
                     bool sourceBMayOverlap = DisplayCaptureSourceBVRAMBank[j] == dstvram;
                     if (sourceBMayOverlap)
                     {
@@ -1171,8 +1200,12 @@ void DekoRenderer::DoCapture()
             else
             {
                 uint8x16_t evaMask = vdupq_n_u8(eva ? 0xFF : 0);
-                for (u32 j = 0; j < height; j++)
+                for (u32 j = 0; j < NativeHeight; j++)
                 {
+                    u32 dstaddr;
+                    if (!getCaptureDstAddr(j, dstaddr))
+                        continue;
+
                     for (u32 i = 0; i < width; i += 16)
                     {
                         uint8x16x4_t pixelsA = vld4q_u8(&srcA[(i + j * 256) * 4]);
