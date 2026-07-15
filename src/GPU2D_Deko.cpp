@@ -1787,6 +1787,14 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         u32 sizeparam = (attrib[0] >> 14) | ((attrib[1] & 0xC000) >> 12);
         u32 width = spritewidth[sizeparam];
         u32 height = spriteheight[sizeparam];
+        u32 displayWidth = width;
+        u32 displayHeight = height;
+        bool doubleSizeAffine = isAffine && (attrib[0] & 0x0200);
+        if (doubleSizeAffine)
+        {
+            displayWidth <<= 1;
+            displayHeight <<= 1;
+        }
 
         u32 addr, strideShift = 0;
         int spriteKind;
@@ -1797,7 +1805,7 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
         if (isAffine)
         {
-            if (attrib[0] & 0x0200)
+            if (doubleSizeAffine)
                 strideShift |= 0x800000U;
 
             strideShift |= ((attrib[1] >> 9) & 0x1F) << 24;
@@ -1858,11 +1866,6 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
         {
             meta |= 0x800000; // add paletted flag
 
-            if (spritemode == 2)
-            {
-                // OBJ window
-                numWindowSpritesTotal++;
-            }
             if (spritemode == 1)
             {
                 // semi transparent
@@ -1925,14 +1928,19 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
 
         if (sprite.Y >= firstLine + linesCount)
             continue;
-        if (sprite.Y + sprite.Height <= firstLine)
+        if (sprite.Y + (s32)displayHeight <= firstLine)
             continue;
 
-        if (sprite.X + sprite.Width <= 0)
+        if (sprite.X + (s32)displayWidth <= 0)
             continue;
         if (sprite.X >= 256)
             continue;
 
+        if (spritemode == 2)
+        {
+            // OBJ window
+            numWindowSpritesTotal++;
+        }
         if (spritemode != 2 && (attrib[0] & 0x1000)
             && (objMosaicSizeX > 0 || objMosaicSizeY > 0))
             objMosaicFallback = true;
