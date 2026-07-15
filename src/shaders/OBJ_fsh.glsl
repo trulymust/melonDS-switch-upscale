@@ -42,6 +42,11 @@ int DecodeMosaicCoord(uint value)
     return coord;
 }
 
+ivec2 FloorToIvec2(vec2 value)
+{
+    return ivec2(floor(value));
+}
+
 void main()
 {
     vec2 spritePosition = InInSpritePosition;
@@ -67,7 +72,7 @@ void main()
             spritePosition.y = float(sourceY * 256);
         }
     }
-    ivec2 inSpritePosition = ivec2(spritePosition);
+    ivec2 inSpritePosition = FloorToIvec2(spritePosition);
 
     if (uint(inSpritePosition.x) >= InSize.x
         || uint(inSpritePosition.y) >= InSize.y)
