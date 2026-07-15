@@ -328,6 +328,7 @@ void DekoRenderer::Reset()
 
         for (int j = 0; j < 4; j++)
         {
+            ClearBGHiResLines(i, j);
             LastBGCnt[i][j] = 0;
             LastBGXPos[i][j] = 0;
             LastBGYPos[i][j] = 0;
@@ -353,6 +354,58 @@ void DekoRenderer::Reset()
     memset(DisplayCaptureSourceBVRAMBank, 0xFF, sizeof(DisplayCaptureSourceBVRAMBank));
 
     memset(OAMShadow, 0, sizeof(OAMShadow));
+}
+
+void DekoRenderer::ClearBGHiResLines(u32 unit, u32 bg)
+{
+    memset(BGHiResLineValid[unit][bg], 0, sizeof(BGHiResLineValid[unit][bg]));
+    BGHiResValid[unit] &= ~(1U << bg);
+}
+
+void DekoRenderer::SetBGHiResLines(u32 unit, u32 bg, u32 firstLine, u32 linesCount, bool valid)
+{
+    if (firstLine >= NativeHeight || linesCount == 0)
+        return;
+
+    if (firstLine + linesCount > NativeHeight)
+        linesCount = NativeHeight - firstLine;
+
+    for (u32 line = firstLine; line < firstLine + linesCount; line++)
+    {
+        u64 bit = 1ULL << (line & 63);
+        u64& word = BGHiResLineValid[unit][bg][line >> 6];
+        if (valid)
+            word |= bit;
+        else
+            word &= ~bit;
+    }
+
+    bool anyValid = false;
+    for (u32 word = 0; word < HiResLineValidWords; word++)
+        anyValid |= BGHiResLineValid[unit][bg][word] != 0;
+
+    if (anyValid)
+        BGHiResValid[unit] |= 1U << bg;
+    else
+        BGHiResValid[unit] &= ~(1U << bg);
+}
+
+bool DekoRenderer::BGHiResLinesValid(u32 unit, u32 bg, u32 firstLine, u32 linesCount) const
+{
+    if ((BGHiResValid[unit] & (1U << bg)) == 0 || firstLine >= NativeHeight || linesCount == 0)
+        return false;
+
+    if (firstLine + linesCount > NativeHeight)
+        return false;
+
+    for (u32 line = firstLine; line < firstLine + linesCount; line++)
+    {
+        u64 bit = 1ULL << (line & 63);
+        if ((BGHiResLineValid[unit][bg][line >> 6] & bit) == 0)
+            return false;
+    }
+
+    return true;
 }
 
 void DekoRenderer::DrawScanline(u32 line, Unit* unit)
@@ -511,6 +564,9 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             GPU::PaletteDirty &= ~(0x3 << num*2);
             compositionDirty = true;
         }
+
+        if (bgmask)
+            compositionDirty = true;
 
         LastDispCnt[num] = CurUnit->DispCnt;
         for (int i = 0; i < 4; i++)
@@ -2038,9 +2094,9 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
             int state = BGState[CurUnit->Num][i];
             bool redrawsFullBGLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
             bool bgHasHiResPath = state >= bgState_Affine;
-            bool hasExistingHiResBG = (BGHiResValid[CurUnit->Num] & (1U << i)) != 0;
-            bool canStartHiResBG = bgHasHiResPath && redrawsFullBGLayer;
-            bool canPreserveHiResBG = hasExistingHiResBG && !redrawsFullBGLayer;
+            bool currentLinesHiRes = BGHiResLinesValid(CurUnit->Num, i, (u32)firstLine, (u32)linesCount);
+            bool canStartHiResBG = bgHasHiResPath;
+            bool canPreserveHiResBG = currentLinesHiRes && !redrawsFullBGLayer;
             bool canUseHiResBG = _3DRenderScale > 1 && (canStartHiResBG || canPreserveHiResBG);
             if (state >= bgState_Text4bpp)
             {
@@ -2098,11 +2154,11 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
                 if (canUseHiResBG)
                 {
                     drawBGAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i], (u32)_3DRenderScale);
-                    BGHiResValid[CurUnit->Num] |= 1U << i;
+                    SetBGHiResLines(CurUnit->Num, i, (u32)firstLine, (u32)linesCount, true);
                 }
                 else
                 {
-                    BGHiResValid[CurUnit->Num] &= ~(1U << i);
+                    SetBGHiResLines(CurUnit->Num, i, (u32)firstLine, (u32)linesCount, false);
                 }
             }
             else
@@ -2126,11 +2182,11 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
                 if (canUseHiResBG)
                 {
                     clearBGAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_BG0 + i], (u32)_3DRenderScale);
-                    BGHiResValid[CurUnit->Num] |= 1U << i;
+                    SetBGHiResLines(CurUnit->Num, i, (u32)firstLine, (u32)linesCount, true);
                 }
                 else
                 {
-                    BGHiResValid[CurUnit->Num] &= ~(1U << i);
+                    SetBGHiResLines(CurUnit->Num, i, (u32)firstLine, (u32)linesCount, false);
                 }
             }
 
@@ -2270,7 +2326,7 @@ void DekoRenderer::ComposeBGOBJ()
                     fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];
                 captureTextureHandleIdx[i] = nativeTextureHandleIdx;
 
-                if (_3DRenderScale > 1 && (BGHiResValid[CurUnit->Num] & (1U << bgOrder[i])))
+                if (_3DRenderScale > 1 && BGHiResLinesValid(CurUnit->Num, bgOrder[i], firstLine, region.LinesCount))
                 {
                     textureHandleIdx[i] = descriptorOffset_IntermedFbHiRes +
                         fb_BG0 + fb_Count * CurUnit->Num + bgOrder[i];

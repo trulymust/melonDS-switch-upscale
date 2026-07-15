@@ -68,6 +68,7 @@ public:
                 OBJBatchLinesCount[unit] = 0;
                 for (int bg = 0; bg < 4; bg++)
                 {
+                    ClearBGHiResLines(unit, bg);
                     BGBatchFirstLine[unit][bg] = 0;
                     BGBatchLinesCount[unit][bg] = 0;
                 }
@@ -83,6 +84,7 @@ private:
     static const u32 MaxRenderScale = 4;
     static const u32 FinalFramebufferWidth = NativeWidth * MaxRenderScale;
     static const u32 FinalFramebufferHeight = NativeHeight * MaxRenderScale;
+    static const u32 HiResLineValidWords = (NativeHeight + 63) / 64;
 
     int _3DRenderScale = 1;
 
@@ -120,6 +122,7 @@ private:
     dk::Image IntermedFramebuffersHiRes[fb_Count*2];
     GpuMemHeap::Allocation IntermedFramebufferHiResMemory;
     u32 BGHiResValid[2] = {};
+    u64 BGHiResLineValid[2][4][HiResLineValidWords] = {};
     bool OBJHiResValid[2] = {};
     bool OBJHiResFallback[2] = {};
     dk::Image OBJDepth;
@@ -291,6 +294,9 @@ private:
     void FlushOBJDraw(u32 curline);
     void FillinCurComposeRegion(ComposeRegion& out);
     void ComposeBGOBJ();
+    void ClearBGHiResLines(u32 unit, u32 bg);
+    void SetBGHiResLines(u32 unit, u32 bg, u32 firstLine, u32 linesCount, bool valid);
+    bool BGHiResLinesValid(u32 unit, u32 bg, u32 firstLine, u32 linesCount) const;
 
 
     bool CmdBufOpen = false;
