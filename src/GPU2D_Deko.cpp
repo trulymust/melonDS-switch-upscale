@@ -2298,7 +2298,10 @@ void DekoRenderer::ComposeBGOBJ()
 
         if (capture)
         {
-            EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, &ShaderComposeBGOBJ});
+            dk::Shader* captureShader = ((region.DispCnt & (1<<7)) || region.ForceBlank)
+                ? &ShaderComposeBGOBJShowBitmap
+                : &ShaderComposeBGOBJ;
+            EmuCmdBuf.bindShaders(DkStageFlag_GraphicsMask, {&ShaderFullscreenQuad, captureShader});
 
             DkViewport nativeViewport = {0.f, 0.f, (float)NativeWidth, (float)NativeHeight, 0.f, 1.f};
             EmuCmdBuf.setViewports(0, {nativeViewport, nativeViewport});
