@@ -425,9 +425,10 @@ void DekoRenderer::DrawScanline(u32 line, Unit* unit)
             compositionDirty = true;
         }
 
-        if ((LastDispCnt[num] ^ CurUnit->DispCnt) & 0xFF030F87)
+        // Bit 3 switches main-engine BG0 between 2D and 3D layer sources.
+        if ((LastDispCnt[num] ^ CurUnit->DispCnt) & 0xFF030F8F)
             bgmask = 0xF;
-        if ((LastDispCnt[num] ^ CurUnit->DispCnt) & 0x31F84)
+        if ((LastDispCnt[num] ^ CurUnit->DispCnt) & 0x31F8C)
             compositionDirty = true;
 
         bool mosaicChanged = LastBGMosaicYMax[num] != CurUnit->BGMosaicYMax
