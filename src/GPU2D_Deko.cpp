@@ -341,6 +341,7 @@ void DekoRenderer::Reset()
         BGOBJRedrawn[i] = 0;
         BGHiResValid[i] = 0;
         OBJHiResValid[i] = false;
+        OBJHiResScale[i] = 0;
         ClearOBJHiResLines(i);
         OBJCompositionDirty[i] = false;
         OBJWindowEmpty[i] = true;
@@ -380,6 +381,7 @@ void DekoRenderer::Reset()
 void DekoRenderer::ClearBGHiResLines(u32 unit, u32 bg)
 {
     memset(BGHiResLineValid[unit][bg], 0, sizeof(BGHiResLineValid[unit][bg]));
+    BGHiResScale[unit][bg] = 0;
     BGHiResValid[unit] &= ~(1U << bg);
 }
 
@@ -390,6 +392,9 @@ void DekoRenderer::SetBGHiResLines(u32 unit, u32 bg, u32 firstLine, u32 linesCou
 
     if (firstLine + linesCount > NativeHeight)
         linesCount = NativeHeight - firstLine;
+
+    if (valid && BGHiResScale[unit][bg] != 0 && BGHiResScale[unit][bg] != _3DRenderScale)
+        ClearBGHiResLines(unit, bg);
 
     for (u32 line = firstLine; line < firstLine + linesCount; line++)
     {
@@ -406,14 +411,24 @@ void DekoRenderer::SetBGHiResLines(u32 unit, u32 bg, u32 firstLine, u32 linesCou
         anyValid |= BGHiResLineValid[unit][bg][word] != 0;
 
     if (anyValid)
+    {
         BGHiResValid[unit] |= 1U << bg;
+        if (valid)
+            BGHiResScale[unit][bg] = (u8)_3DRenderScale;
+    }
     else
+    {
         BGHiResValid[unit] &= ~(1U << bg);
+        BGHiResScale[unit][bg] = 0;
+    }
 }
 
 bool DekoRenderer::BGHiResLinesValid(u32 unit, u32 bg, u32 firstLine, u32 linesCount) const
 {
     if ((BGHiResValid[unit] & (1U << bg)) == 0 || firstLine >= NativeHeight || linesCount == 0)
+        return false;
+
+    if (BGHiResScale[unit][bg] != _3DRenderScale)
         return false;
 
     if (firstLine + linesCount > NativeHeight)
@@ -433,6 +448,7 @@ void DekoRenderer::ClearOBJHiResLines(u32 unit)
 {
     memset(OBJHiResLineValid[unit], 0, sizeof(OBJHiResLineValid[unit]));
     OBJHiResValid[unit] = false;
+    OBJHiResScale[unit] = 0;
 }
 
 void DekoRenderer::SetOBJHiResLines(u32 unit, u32 firstLine, u32 linesCount, bool valid)
@@ -442,6 +458,9 @@ void DekoRenderer::SetOBJHiResLines(u32 unit, u32 firstLine, u32 linesCount, boo
 
     if (firstLine + linesCount > NativeHeight)
         linesCount = NativeHeight - firstLine;
+
+    if (valid && OBJHiResScale[unit] != 0 && OBJHiResScale[unit] != _3DRenderScale)
+        ClearOBJHiResLines(unit);
 
     for (u32 line = firstLine; line < firstLine + linesCount; line++)
     {
@@ -458,11 +477,23 @@ void DekoRenderer::SetOBJHiResLines(u32 unit, u32 firstLine, u32 linesCount, boo
         anyValid |= OBJHiResLineValid[unit][word] != 0;
 
     OBJHiResValid[unit] = anyValid;
+    if (anyValid)
+    {
+        if (valid)
+            OBJHiResScale[unit] = (u8)_3DRenderScale;
+    }
+    else
+    {
+        OBJHiResScale[unit] = 0;
+    }
 }
 
 bool DekoRenderer::OBJHiResLinesValid(u32 unit, u32 firstLine, u32 linesCount) const
 {
     if (!OBJHiResValid[unit] || firstLine >= NativeHeight || linesCount == 0)
+        return false;
+
+    if (OBJHiResScale[unit] != _3DRenderScale)
         return false;
 
     if (firstLine + linesCount > NativeHeight)

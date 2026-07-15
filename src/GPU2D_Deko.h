@@ -124,8 +124,10 @@ private:
     dk::Image IntermedFramebuffersHiRes[fb_Count*2];
     GpuMemHeap::Allocation IntermedFramebufferHiResMemory;
     u32 BGHiResValid[2] = {};
+    u8 BGHiResScale[2][4] = {};
     u64 BGHiResLineValid[2][4][HiResLineValidWords] = {};
     bool OBJHiResValid[2] = {};
+    u8 OBJHiResScale[2] = {};
     u64 OBJHiResLineValid[2][HiResLineValidWords] = {};
     dk::Image OBJDepth;
     GpuMemHeap::Allocation OBJDepthMemory;
