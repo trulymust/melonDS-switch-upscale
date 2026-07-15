@@ -1930,8 +1930,10 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     drawOBJLayerAtScale(IntermedFramebuffers[fb_Count * CurUnit->Num + fb_OBJ], OBJDepth, 1);
     OBJHiResFallback[CurUnit->Num] |= objMosaicFallback;
     bool redrawsFullOBJLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
-    bool canUseHiResOBJ = _3DRenderScale > 1 && objHasHiResPath && !OBJHiResFallback[CurUnit->Num]
-        && (OBJHiResValid[CurUnit->Num] || redrawsFullOBJLayer);
+    bool canStartHiResOBJ = objHasHiResPath && redrawsFullOBJLayer;
+    bool canPreserveHiResOBJ = OBJHiResValid[CurUnit->Num] && !redrawsFullOBJLayer;
+    bool canUseHiResOBJ = _3DRenderScale > 1 && !OBJHiResFallback[CurUnit->Num]
+        && (canStartHiResOBJ || canPreserveHiResOBJ);
     if (canUseHiResOBJ)
     {
         drawOBJLayerAtScale(IntermedFramebuffersHiRes[fb_Count * CurUnit->Num + fb_OBJ], OBJDepthHiRes, (u32)_3DRenderScale);
@@ -2036,8 +2038,10 @@ void DekoRenderer::FlushBGDraw(u32 curline, u32 bgmask)
             int state = BGState[CurUnit->Num][i];
             bool redrawsFullBGLayer = firstLine == 0 && linesCount == (s32)NativeHeight;
             bool bgHasHiResPath = state >= bgState_Affine;
-            bool canUseHiResBG = _3DRenderScale > 1 && bgHasHiResPath
-                && ((BGHiResValid[CurUnit->Num] & (1U << i)) || redrawsFullBGLayer);
+            bool hasExistingHiResBG = (BGHiResValid[CurUnit->Num] & (1U << i)) != 0;
+            bool canStartHiResBG = bgHasHiResPath && redrawsFullBGLayer;
+            bool canPreserveHiResBG = hasExistingHiResBG && !redrawsFullBGLayer;
+            bool canUseHiResBG = _3DRenderScale > 1 && (canStartHiResBG || canPreserveHiResBG);
             if (state >= bgState_Text4bpp)
             {
                 BGOBJRedrawn[CurUnit->Num] |= (1 << i);
