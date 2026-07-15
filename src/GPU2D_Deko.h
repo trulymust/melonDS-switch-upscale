@@ -66,7 +66,7 @@ public:
                 OBJBatchFirstLine[unit] = 0;
                 OBJBatchLinesCount[unit] = 0;
                 ClearOBJHiResLines(unit);
-                OBJCompositionDirty[unit] = false;
+                OBJCompositionDirty[unit] = true;
                 for (int bg = 0; bg < 4; bg++)
                 {
                     ClearBGHiResLines(unit, bg);
