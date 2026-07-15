@@ -236,6 +236,7 @@ private:
         u32 EVA, EVB, EVY;
         u32 BGNumMask[4];
         u32 RenderScale, FinalScale, HiResBGMask, HiResOBJ;
+        u32 DirectBitmapFullWhite, __pad0, __pad1, __pad2;
         u32 Window[192*4];
     };
     const u32 ComposeUniformSize = (sizeof(ComposeUniform) + DK_UNIFORM_BUF_ALIGNMENT - 1) & ~(DK_UNIFORM_BUF_ALIGNMENT - 1);

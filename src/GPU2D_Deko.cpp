@@ -2366,6 +2366,7 @@ void DekoRenderer::ComposeBGOBJ()
         u32 dispmode = region.DispCnt >> 16;
         dispmode &= (CurUnit->Num ? 0x1 : 0x3);
         bool showDirectBitmap = dispmode != 1 || (region.DispCnt & (1<<7)) || region.ForceBlank;
+        bool directBitmapFullWhite = dispmode == 0 || (region.DispCnt & (1<<7)) || region.ForceBlank;
 
         if (capture)
         {
@@ -2479,6 +2480,8 @@ void DekoRenderer::ComposeBGOBJ()
             composeUniform.MasterBrightnessMode = 0;
         if (composeUniform.MasterBrightnessFactor > 16)
             composeUniform.MasterBrightnessFactor = 16;
+        if (dispmode == 0 || region.ForceBlank)
+            composeUniform.MasterBrightnessMode = 0;
         composeUniform.BlendCnt = region.BlendCnt;
         composeUniform.StandardColorEffect = (region.BlendCnt >> 6) & 0x3;
         composeUniform.EVA = region.EVA;
@@ -2486,6 +2489,7 @@ void DekoRenderer::ComposeBGOBJ()
         composeUniform.EVY = region.EVY;
         composeUniform.RenderScale = _3DRenderScale;
         composeUniform.FinalScale = _3DRenderScale;
+        composeUniform.DirectBitmapFullWhite = directBitmapFullWhite ? 1 : 0;
         EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
             0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
             &composeUniform);
@@ -2518,6 +2522,7 @@ void DekoRenderer::ComposeBGOBJ()
             composeUniform.FinalScale = 1;
             composeUniform.HiResBGMask = 0;
             composeUniform.HiResOBJ = 0;
+            composeUniform.DirectBitmapFullWhite = ((region.DispCnt & (1<<7)) || region.ForceBlank) ? 1 : 0;
             EmuCmdBuf.pushConstants(Gfx::DataHeap->GpuAddr(ComposeUniformMemory), ComposeUniformSize,
                 0, sizeof(ComposeUniform)-sizeof(composeUniform.Window),
                 &composeUniform);
