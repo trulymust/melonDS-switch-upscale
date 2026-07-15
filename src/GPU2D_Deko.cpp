@@ -1793,7 +1793,8 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
     };
 
     int numSprites[spriteKind_Count] = {};
-    SpriteSpec sprites[spriteKind_Count][128];
+    static const int MaxSpriteSpecsPerKind = 256;
+    SpriteSpec sprites[spriteKind_Count][MaxSpriteSpecsPerKind];
     int numSpritesTotal = 0;
     int numWindowSpritesTotal = 0;
     bool objMosaicFallback = false;
@@ -1958,45 +1959,55 @@ void DekoRenderer::FlushOBJDraw(u32 curline)
                     : (spritemode == 2 ? spriteKind_RegularWindow4bpp : spriteKind_Regular4bpp);
             }
         }
-        SpriteSpec& sprite = sprites[spriteKind][numSprites[spriteKind]];
+        s16 spriteX = (s16)((s32)(attrib[1] << 23) >> 23);
+        s32 spriteY = attrib[0] & 0xFF;
+        s32 primaryY = spriteY >= 192 ? spriteY - 256 : spriteY;
 
-        sprite.X = (s16)((s32)(attrib[1] << 23) >> 23);
-        sprite.Y = attrib[0] & 0xFF;
-        // not entirely accurate (it doesn't handle sprites coming off on the other side)
-        if (sprite.Y >= 192)
-            sprite.Y = sprite.Y - 256;
-
-        sprite.Width = spritewidth[sizeparam];
-        sprite.Height = spriteheight[sizeparam];
-        sprite.BaseAddr = addr;
-        sprite.StrideShift = strideShift;
-        sprite.Meta = meta;
-        sprite.Depth = depthKey;
-        //printf("%d %d %x %x %d %d %d %d %d\n", spriteKind, prio, sprite.BaseAddr, sprite.StrideShift, tilenum, sprite.X, sprite.Y, sprite.Width, sprite.Height);
-
-        if (sprite.Y >= firstLine + linesCount)
+        if (spriteX + (s32)displayWidth <= 0)
             continue;
-        if (sprite.Y + (s32)displayHeight <= firstLine)
+        if (spriteX >= 256)
             continue;
 
-        if (sprite.X + (s32)displayWidth <= 0)
-            continue;
-        if (sprite.X >= 256)
+        auto addVisibleSprite = [&](s32 y)
+        {
+            if (y >= firstLine + linesCount)
+                return 0;
+            if (y + (s32)displayHeight <= firstLine)
+                return 0;
+            if (numSprites[spriteKind] >= MaxSpriteSpecsPerKind)
+                return 0;
+
+            SpriteSpec& sprite = sprites[spriteKind][numSprites[spriteKind]];
+
+            sprite.X = spriteX;
+            sprite.Y = y;
+            sprite.Width = spritewidth[sizeparam];
+            sprite.Height = spriteheight[sizeparam];
+            sprite.BaseAddr = addr;
+            sprite.StrideShift = strideShift;
+            sprite.Meta = meta;
+            sprite.Depth = depthKey;
+            //printf("%d %d %x %x %d %d %d %d %d\n", spriteKind, prio, sprite.BaseAddr, sprite.StrideShift, tilenum, sprite.X, sprite.Y, sprite.Width, sprite.Height);
+
+            numSprites[spriteKind]++;
+            numSpritesTotal++;
+            return 1;
+        };
+
+        int addedSprites = addVisibleSprite(primaryY);
+        if (spriteY < 192 && spriteY + (s32)displayHeight > 256)
+            addedSprites += addVisibleSprite(spriteY - 256);
+
+        if (addedSprites == 0)
             continue;
 
         if (spritemode == 2)
-        {
-            // OBJ window
-            numWindowSpritesTotal++;
-        }
+            numWindowSpritesTotal += addedSprites;
         if (spritemode != 2 && (attrib[0] & 0x1000)
             && (objMosaicSizeX > 0 || objMosaicSizeY > 0))
             objMosaicFallback = true;
         if (spritemode != 2 && isAffine)
             objHasHiResPath = true;
-
-        numSprites[spriteKind]++;
-        numSpritesTotal++;
     }
 
     EmuCmdBuf.setScissors(0, {DkScissor{0, (u32)firstLine, 256, (u32)linesCount}});
